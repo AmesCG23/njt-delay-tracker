@@ -1,0 +1,69 @@
+# .github/workflows/run_pipeline.yml
+#
+# This tells GitHub to run our delay tracker every 5 minutes, automatically.
+# No server required — GitHub's computers do the work for free.
+
+name: Run NJT Delay Tracker
+
+on:
+  schedule:
+    # Cron syntax: minute hour day month weekday
+    # */5 * * * * = every 5 minutes
+    - cron: "*/5 * * * *"
+
+  # Also lets you trigger a manual run from GitHub's website
+  # (useful for testing — go to Actions tab → click "Run workflow")
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no posting or logging)?"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  run-tracker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4  # Kill if it hangs (prevents runaway billing)
+
+    steps:
+      # Step 1: Download your code from GitHub
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"  # Cache dependencies to speed up runs
+
+      # Step 3: Install the Python libraries we need
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Step 4: Run the pipeline
+      # The ${{ secrets.X }} parts pull in your API keys from GitHub Secrets
+      # (you'll add those in the next setup step — they never appear in code)
+      - name: Run delay tracker
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: python src/main.py
+
+      # Step 5: Save the seen_alerts.json file between runs
+      # Without this, every run would think every alert is new
+      - name: Save seen alerts state
+        uses: actions/cache@v4
+        with:
+          path: data/seen_alerts.json
+          key: seen-alerts-${{ github.run_id }}
+          restore-keys: |
+            seen-alerts-
