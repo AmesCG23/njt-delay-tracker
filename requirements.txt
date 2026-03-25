@@ -1,0 +1,16 @@
+# NJT Delay Tracker — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Web scraping
+requests==2.31.0
+beautifulsoup4==4.12.3
+
+# Claude API
+anthropic==0.40.0
+
+# Google Sheets
+gspread==6.1.2
+google-auth==2.29.0
+
+# Bluesky
+atproto==0.0.55
