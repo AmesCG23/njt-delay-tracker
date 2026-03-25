@@ -55,6 +55,12 @@ DELAY_KEYWORDS = [
 # ── File where we track alerts we've already processed (prevents duplicates) ──
 SEEN_ALERTS_FILE = "data/seen_alerts.json"
 
+# Create the data directory and file if they don't exist yet
+os.makedirs("data", exist_ok=True)
+if not os.path.exists(SEEN_ALERTS_FILE):
+    with open(SEEN_ALERTS_FILE, "w") as f:
+        json.dump({}, f)
+
 
 def load_seen_alerts():
     """Load the list of alert texts we've already processed."""
