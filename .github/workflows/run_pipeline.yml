@@ -1,69 +1,124 @@
 # .github/workflows/run_pipeline.yml
 #
-# This tells GitHub to run our delay tracker every 5 minutes, automatically.
-# No server required — GitHub's computers do the work for free.
+# Schedule:
+#   Collect during rush hours only (every 15 min):
+#     Morning rush:  5:00am–11:00am ET  = 9:00am–3:00pm UTC (EDT)
+#     Evening rush:  3:00pm–9:30pm ET   = 7:00pm–1:30am UTC (EDT)
+#   Summary posts:
+#     Morning summary:  10:30am ET = 14:30 UTC
+#     Evening summary:   9:00pm ET = 01:00 UTC (next calendar day)
+#
+# All times use EDT (UTC-4). In EST winter months posts shift ~1 hour -- fine.
+# Monthly GitHub Actions usage: ~540 minutes, well within the 2,000 free tier.
 
-name: Run NJT Delay Tracker
+name: NJT Delay Tracker
 
 on:
   schedule:
-    # Cron syntax: minute hour day month weekday
-    # */5 * * * * = every 5 minutes
-    - cron: "*/5 * * * *"
+    # Collect: every 15 min during morning rush (5am-11am EDT = 9am-3pm UTC)
+    - cron: "*/15 9-14 * * 1-5"
+    # Collect: every 15 min during evening rush (3pm-9:30pm EDT = 7pm-1am UTC)
+    - cron: "*/15 19-23 * * 1-5"
+    - cron: "*/15 0-1 * * 2-6"
+    # Morning summary: 10:30am EDT (14:30 UTC), weekdays
+    - cron: "30 14 * * 1-5"
+    # Evening summary: 9:00pm EDT (01:00 UTC next day), weekdays
+    - cron: "0 1 * * 2-6"
 
-  # Also lets you trigger a manual run from GitHub's website
-  # (useful for testing — go to Actions tab → click "Run workflow")
+  # Manual trigger for testing
   workflow_dispatch:
     inputs:
+      mode:
+        description: "collect or summarize"
+        required: false
+        default: "collect"
+        type: choice
+        options: ["collect", "summarize"]
+      period:
+        description: "morning or evening (only used when mode=summarize)"
+        required: false
+        default: "morning"
+        type: choice
+        options: ["morning", "evening"]
       dry_run:
         description: "Dry run (no posting or logging)?"
         required: false
         default: "false"
         type: choice
-        options:
-          - "false"
-          - "true"
+        options: ["false", "true"]
 
 jobs:
   run-tracker:
     runs-on: ubuntu-latest
-    timeout-minutes: 4  # Kill if it hangs (prevents runaway billing)
+    timeout-minutes: 4
 
     steps:
-      # Step 1: Download your code from GitHub
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Step 2: Install Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"  # Cache dependencies to speed up runs
+          cache: "pip"
 
-      # Step 3: Install the Python libraries we need
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Step 4: Run the pipeline
-      # The ${{ secrets.X }} parts pull in your API keys from GitHub Secrets
-      # (you'll add those in the next setup step — they never appear in code)
-      - name: Run delay tracker
+      # Work out which mode we're in.
+      # Manual runs use workflow_dispatch inputs.
+      # Scheduled runs detect mode from current UTC time.
+      - name: Determine mode and period
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+            echo "period=${{ github.event.inputs.period }}" >> $GITHUB_OUTPUT
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +%H)
+            MINUTE=$(date -u +%M)
+            echo "UTC time: ${HOUR}:${MINUTE}"
+
+            if [ "$HOUR" = "14" ] && [ "$MINUTE" -ge 25 ] && [ "$MINUTE" -le 35 ]; then
+              echo "mode=summarize" >> $GITHUB_OUTPUT
+              echo "period=morning" >> $GITHUB_OUTPUT
+            elif ([ "$HOUR" = "01" ] && [ "$MINUTE" -le 5 ]) || ([ "$HOUR" = "00" ] && [ "$MINUTE" -ge 55 ]); then
+              echo "mode=summarize" >> $GITHUB_OUTPUT
+              echo "period=evening" >> $GITHUB_OUTPUT
+            else
+              echo "mode=collect" >> $GITHUB_OUTPUT
+              echo "period=morning" >> $GITHUB_OUTPUT
+            fi
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Restore both state files from cache
+      - name: Restore seen alerts cache
+        uses: actions/cache@v4
+        with:
+          path: data/seen_alerts.json
+          key: seen-alerts-${{ github.run_id }}
+          restore-keys: seen-alerts-
+
+      - name: Restore delay log cache
+        uses: actions/cache@v4
+        with:
+          path: data/delay_log.json
+          key: delay-log-${{ github.run_id }}
+          restore-keys: delay-log-
+
+      # Run the pipeline
+      - name: Run pipeline
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
           BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
-        run: python src/main.py
-
-      # Step 5: Save the seen_alerts.json file between runs
-      # Without this, every run would think every alert is new
-      - name: Save seen alerts state
-        uses: actions/cache@v4
-        with:
-          path: data/seen_alerts.json
-          key: seen-alerts-${{ github.run_id }}
-          restore-keys: |
-            seen-alerts-
+          MODE: ${{ steps.mode.outputs.mode }}
+          PERIOD: ${{ steps.mode.outputs.period }}
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+        run: |
+          echo "MODE=$MODE | PERIOD=$PERIOD | DRY_RUN=$DRY_RUN"
+          python src/main.py
