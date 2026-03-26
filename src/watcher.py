@@ -191,16 +191,12 @@ def identify_line(text, line_hint=None):
 
 
 def get_new_delays(min_delay_minutes=10):
-
-  def get_new_delays(min_delay_minutes=10):
-
-    # ── Seed mode: mark everything as seen without processing ──────────────
-    seed_mode = os.environ.get("SEED_ONLY", "false").lower() == "true"
-    if seed_mode:
-        print("[WATCHER] SEED MODE: marking all current posts as seen, nothing will be processed.")
-      
     """
     Main entry point: poll all configured Bluesky accounts, return new delays.
+
+    SEED_ONLY mode: if the environment variable SEED_ONLY=true is set, this
+    function marks all current posts as seen but returns an empty list,
+    processing nothing. Use this on first run to avoid a spam blast of old posts.
 
     Returns a list of dicts, each containing:
       - text:          raw post text
@@ -209,6 +205,11 @@ def get_new_delays(min_delay_minutes=10):
       - timestamp:     ISO format string
       - source:        which Bluesky account this came from
     """
+    # ── Check for seed mode ───────────────────────────────────────────────────
+    seed_mode = os.environ.get("SEED_ONLY", "false").lower() == "true"
+    if seed_mode:
+        print("[WATCHER] SEED MODE — marking all current posts as seen, returning nothing.")
+
     print(f"[WATCHER] Polling Bluesky alert accounts at {datetime.now().strftime('%H:%M:%S')}...")
 
     client = make_client()
@@ -225,6 +226,10 @@ def get_new_delays(min_delay_minutes=10):
 
             # Mark as seen regardless of whether it qualifies
             seen[uri] = datetime.now(timezone.utc).timestamp()
+
+            # In seed mode: mark as seen but skip all processing
+            if seed_mode:
+                continue
 
             if not text:
                 continue
@@ -250,11 +255,13 @@ def get_new_delays(min_delay_minutes=10):
             })
             print(f"[WATCHER] NEW: {line} | {delay_minutes} min | {text[:80]}...")
 
-    # In seed mode, collect URIs but don't queue for processing
-        if seed_mode:
-            continue
-          
-    # Deduplicate: same alert text posted by multiple accounts = one event
+    save_seen_alerts(seen)
+
+    if seed_mode:
+        print(f"[WATCHER] Seed complete — {len(seen)} post URIs marked as seen.")
+        return []
+
+    # ── Deduplicate: same alert from multiple accounts = one event ────────────
     seen_texts = set()
     deduplicated = []
     for d in new_delays:
@@ -264,8 +271,6 @@ def get_new_delays(min_delay_minutes=10):
             deduplicated.append(d)
         else:
             print(f"[WATCHER] Deduped cross-account duplicate: {d['text'][:60]}...")
-
-    save_seen_alerts(seen)
 
     if not deduplicated:
         print("[WATCHER] No new qualifying delays found.")
