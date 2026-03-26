@@ -191,6 +191,14 @@ def identify_line(text, line_hint=None):
 
 
 def get_new_delays(min_delay_minutes=10):
+
+  def get_new_delays(min_delay_minutes=10):
+
+    # ── Seed mode: mark everything as seen without processing ──────────────
+    seed_mode = os.environ.get("SEED_ONLY", "false").lower() == "true"
+    if seed_mode:
+        print("[WATCHER] SEED MODE: marking all current posts as seen, nothing will be processed.")
+      
     """
     Main entry point: poll all configured Bluesky accounts, return new delays.
 
@@ -242,6 +250,10 @@ def get_new_delays(min_delay_minutes=10):
             })
             print(f"[WATCHER] NEW: {line} | {delay_minutes} min | {text[:80]}...")
 
+    # In seed mode, collect URIs but don't queue for processing
+        if seed_mode:
+            continue
+          
     # Deduplicate: same alert text posted by multiple accounts = one event
     seen_texts = set()
     deduplicated = []
