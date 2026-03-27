@@ -72,7 +72,7 @@ def get_utc_window(period):
     print(f"[AGGREGATOR] Timezone: {'EDT' if is_edt else 'EST'} (UTC-{offset})")
 
     # Build the UTC window
-    today = now_utc.date()
+    today = (now_utc - timedelta(hours=offset)).date()
     start_et_naive = datetime(today.year, today.month, today.day,
                                w["start_hour_et"], 0, 0)
     end_et_naive   = datetime(today.year, today.month, today.day,
