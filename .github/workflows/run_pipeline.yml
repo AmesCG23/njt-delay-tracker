@@ -1,29 +1,43 @@
 # .github/workflows/run_pipeline.yml
 #
-# Schedule:
-#   Collect during rush hours only (every 15 min):
-#     Morning rush:  5:00am–11:00am ET  = 9:00am–3:00pm UTC (EDT)
-#     Evening rush:  3:00pm–9:30pm ET   = 7:00pm–1:30am UTC (EDT)
-#   Summary posts:
-#     Morning summary:  10:30am ET = 14:30 UTC
-#     Evening summary:   9:00pm ET = 01:00 UTC (next calendar day)
+# Schedule (all times UTC, covers both EDT=UTC-4 and EST=UTC-5):
 #
-# All times use EDT (UTC-4). In EST winter months posts shift ~1 hour -- fine.
-# Monthly GitHub Actions usage: ~540 minutes, well within the 2,000 free tier.
+#   Morning collect:  08:00-15:00 UTC
+#     EDT: 4:00am-11:00am ET  (covers 5am-10:30am rush with margin)
+#     EST: 3:00am-10:00am ET  (covers 5am-10:00am rush with margin)
+#
+#   Evening collect:  19:00-02:00 UTC
+#     EDT: 3:00pm-10:00pm ET  (covers 3:30pm-9pm rush with margin)
+#     EST: 2:00pm-9:00pm ET   (covers 3:30pm-9pm rush with margin)
+#
+#   Morning summary:  15:00 UTC
+#     EDT: 11:00am ET  (30 min after rush window closes)
+#     EST: 10:00am ET  (30 min after rush window closes)
+#
+#   Evening summary:  02:00 UTC
+#     EDT: 10:00pm ET  (30 min after rush window closes)
+#     EST:  9:00pm ET  (30 min after rush window closes)
+#
+# Monthly usage: ~630 minutes — well within GitHub's 2,000 free tier.
 
 name: NJT Delay Tracker
 
 on:
   schedule:
-    # Collect: every 15 min during morning rush (5am-11am EDT = 9am-3pm UTC)
-    - cron: "*/15 9-14 * * 1-5"
-    # Collect: every 15 min during evening rush (3pm-9:30pm EDT = 7pm-1am UTC)
+    # Morning collect: every 15 min, 08:00-14:45 UTC (covers EDT and EST rush)
+    - cron: "*/15 8-14 * * 1-5"
+
+    # Evening collect: every 15 min, 19:00-23:45 UTC
     - cron: "*/15 19-23 * * 1-5"
+
+    # Evening collect continued: 00:00-01:45 UTC next day
     - cron: "*/15 0-1 * * 2-6"
-    # Morning summary: 10:30am EDT (14:30 UTC), weekdays
-    - cron: "30 14 * * 1-5"
-    # Evening summary: 9:00pm EDT (01:00 UTC next day), weekdays
-    - cron: "0 1 * * 2-6"
+
+    # Morning summary: 15:00 UTC (11am EDT / 10am EST)
+    - cron: "0 15 * * 1-5"
+
+    # Evening summary: 02:00 UTC (10pm EDT / 9pm EST)
+    - cron: "0 2 * * 2-6"
 
   # Manual trigger for testing
   workflow_dispatch:
@@ -67,7 +81,8 @@ jobs:
 
       # Work out which mode we're in.
       # Manual runs use workflow_dispatch inputs.
-      # Scheduled runs detect mode from current UTC time.
+      # Scheduled runs detect mode by checking if current UTC time
+      # matches either summary window (with a 10-minute tolerance).
       - name: Determine mode and period
         id: mode
         run: |
@@ -80,10 +95,18 @@ jobs:
             MINUTE=$(date -u +%M)
             echo "UTC time: ${HOUR}:${MINUTE}"
 
-            if [ "$HOUR" = "14" ] && [ "$MINUTE" -ge 25 ] && [ "$MINUTE" -le 35 ]; then
+            # Morning summary window: 14:55-15:05 UTC
+            if [ "$HOUR" = "15" ] && [ "$MINUTE" -le 5 ]; then
               echo "mode=summarize" >> $GITHUB_OUTPUT
               echo "period=morning" >> $GITHUB_OUTPUT
-            elif ([ "$HOUR" = "01" ] && [ "$MINUTE" -le 5 ]) || ([ "$HOUR" = "00" ] && [ "$MINUTE" -ge 55 ]); then
+            elif [ "$HOUR" = "14" ] && [ "$MINUTE" -ge 55 ]; then
+              echo "mode=summarize" >> $GITHUB_OUTPUT
+              echo "period=morning" >> $GITHUB_OUTPUT
+            # Evening summary window: 01:55-02:05 UTC
+            elif [ "$HOUR" = "2" ] && [ "$MINUTE" -le 5 ]; then
+              echo "mode=summarize" >> $GITHUB_OUTPUT
+              echo "period=evening" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "1" ] && [ "$MINUTE" -ge 55 ]; then
               echo "mode=summarize" >> $GITHUB_OUTPUT
               echo "period=evening" >> $GITHUB_OUTPUT
             else
