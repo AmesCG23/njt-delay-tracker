@@ -5,6 +5,14 @@ Takes a parsed delay dict from the Interpreter and calculates
 the estimated economic cost of the delay.
 
 Formula: riders × (delay_minutes / 60) × VTTS_RATE
+
+Design decisions:
+  - All trains use peak ridership figures. Since we only collect during
+    morning and evening rush windows, every qualifying delay is a peak event.
+    Time-band logic has been removed to avoid miscategorisation.
+  - Cancellations are assumed to impose a 60-minute delay regardless of
+    where on the line they occur. A cancellation means waiting for the next
+    train, which on most lines is roughly an hour during rush hour.
 """
 
 # ── Value of Travel Time ──────────────────────────────────────────────────────
@@ -15,62 +23,41 @@ VTTS_RATE = 24.00  # dollars per hour
 # National USDOT default (disclosed in methodology for transparency)
 VTTS_NATIONAL_DEFAULT = 18.80
 
-# ── Riders per train by line and time band ────────────────────────────────────
+# ── Riders per train (peak figures used for all events) ───────────────────────
 # Built from: 62M annual rail riders (2025), per-line train frequency data,
 # and RPA anchor data (63,014 daily Penn Station boardings).
-# These are averages — actual trains vary. Disclosed as estimates on the website.
+# Peak figures used exclusively since all polling occurs during rush windows.
 RIDERS_PER_TRAIN = {
-    "Northeast Corridor": {
-        "peak": 825, "off_peak": 250, "weekend": 180
-    },
-    "North Jersey Coast": {
-        "peak": 500, "off_peak": 150, "weekend": 120
-    },
-    "Morris & Essex": {
-        "peak": 550, "off_peak": 175, "weekend": 130
-    },
-    "Montclair-Boonton": {
-        "peak": 415, "off_peak": 110, "weekend": 90
-    },
-    "Main/Bergen County": {
-        "peak": 450, "off_peak": 120, "weekend": 95
-    },
-    "Raritan Valley": {
-        "peak": 450, "off_peak": 125, "weekend": 100
-    },
-    "Pascack Valley": {
-        "peak": 315, "off_peak": 85, "weekend": 65
-    },
-    "Port Jervis": {
-        "peak": 300, "off_peak": 75, "weekend": 60
-    },
-    "Gladstone Branch": {
-        "peak": 300, "off_peak": 80, "weekend": 60
-    },
-    "Atlantic City": {
-        "peak": 260, "off_peak": 100, "weekend": 90
-    },
-    # Fallback for any line we can't identify
-    "Unknown": {
-        "peak": 400, "off_peak": 120, "weekend": 90
-    },
+    "Northeast Corridor": 825,
+    "North Jersey Coast":  500,
+    "Morris & Essex":      550,
+    "Montclair-Boonton":   415,
+    "Main/Bergen County":  450,
+    "Raritan Valley":      450,
+    "Pascack Valley":      315,
+    "Port Jervis":         300,
+    "Gladstone Branch":    300,
+    "Atlantic City":       260,
+    "Unknown":             400,   # fallback
 }
 
+# Assumed delay for cancellations (minutes).
+# Reflects typical wait for next scheduled service during peak hours.
+CANCELLATION_ASSUMED_MINUTES = 60
 
-def get_riders(line, time_band):
-    """Look up estimated riders for a given line and time band."""
-    # Try exact match first, then fuzzy match
+
+def get_riders(line):
+    """Look up estimated peak riders for a given line."""
     if line in RIDERS_PER_TRAIN:
-        return RIDERS_PER_TRAIN[line][time_band]
+        return RIDERS_PER_TRAIN[line]
 
-    # Try partial match (e.g. "Morris & Essex Lines" → "Morris & Essex")
+    # Fuzzy match (e.g. "Morris & Essex Lines" -> "Morris & Essex")
     for key in RIDERS_PER_TRAIN:
         if key.lower() in line.lower() or line.lower() in key.lower():
-            return RIDERS_PER_TRAIN[key][time_band]
+            return RIDERS_PER_TRAIN[key]
 
-    # Fall back to Unknown
     print(f"[CALCULATOR] Warning: no rider data for line '{line}', using fallback.")
-    return RIDERS_PER_TRAIN["Unknown"][time_band]
+    return RIDERS_PER_TRAIN["Unknown"]
 
 
 def calculate_cost(interpreted_delay):
@@ -86,13 +73,11 @@ def calculate_cost(interpreted_delay):
     """
     delay_minutes = interpreted_delay.get("delay_minutes")
     line = interpreted_delay.get("line", "Unknown")
-    time_band = interpreted_delay.get("time_band", "off_peak")
     is_cancellation = interpreted_delay.get("is_cancellation", False)
 
-    # For cancellations, we use a standard 45-minute equivalent
-    # (average wait for next train during peak). This is disclosed in methodology.
+    # Cancellations: use standard assumed delay of 60 minutes.
     if is_cancellation and (delay_minutes is None or delay_minutes == 0):
-        delay_minutes = 45
+        delay_minutes = CANCELLATION_ASSUMED_MINUTES
         interpreted_delay["delay_minutes"] = delay_minutes
         interpreted_delay["cancellation_assumed_delay"] = True
 
@@ -100,7 +85,7 @@ def calculate_cost(interpreted_delay):
         print(f"[CALCULATOR] Cannot calculate — no delay duration for: {line}")
         return None
 
-    riders = get_riders(line, time_band)
+    riders = get_riders(line)
     hours_delayed = delay_minutes / 60
     dollar_estimate = round(riders * hours_delayed * VTTS_RATE, 2)
 
@@ -124,7 +109,6 @@ if __name__ == "__main__":
             "direction": "inbound",
             "cause": "mechanical issue",
             "train_number": "3876",
-            "time_band": "peak",
             "is_cancellation": False,
             "raw_text": "NEC train #3876 is up to 34 min. late due to mechanical issues.",
         },
@@ -134,9 +118,17 @@ if __name__ == "__main__":
             "direction": "outbound",
             "cause": "crew availability",
             "train_number": "6042",
-            "time_band": "peak",
             "is_cancellation": True,
             "raw_text": "M&E train #6042 is cancelled due to crew availability.",
+        },
+        {
+            "line": "Raritan Valley",
+            "delay_minutes": None,
+            "direction": "inbound",
+            "cause": "equipment availability",
+            "train_number": "4201",
+            "is_cancellation": True,
+            "raw_text": "RVL train #4201 is cancelled due to equipment availability.",
         },
     ]
 
@@ -144,3 +136,4 @@ if __name__ == "__main__":
         result = calculate_cost(delay)
         if result:
             print(json.dumps(result, indent=2))
+            print()
