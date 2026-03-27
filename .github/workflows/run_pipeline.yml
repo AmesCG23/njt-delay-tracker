@@ -1,55 +1,32 @@
 # .github/workflows/run_pipeline.yml
 #
-# Schedule (all times UTC, covers both EDT=UTC-4 and EST=UTC-5):
+# Two scheduled jobs — one for each rush hour summary.
+# Each job runs once, fetches the full window of Bluesky posts,
+# interprets, calculates, and posts. No continuous polling needed.
 #
-#   Morning collect:  08:00-15:00 UTC
-#     EDT: 4:00am-11:00am ET  (covers 5am-10:30am rush with margin)
-#     EST: 3:00am-10:00am ET  (covers 5am-10:00am rush with margin)
+# Times (UTC):
+#   Morning summary: 15:00 UTC = 11:00am EDT / 10:00am EST
+#   Evening summary: 02:00 UTC = 10:00pm EDT /  9:00pm EST
 #
-#   Evening collect:  19:00-02:00 UTC
-#     EDT: 3:00pm-10:00pm ET  (covers 3:30pm-9pm rush with margin)
-#     EST: 2:00pm-9:00pm ET   (covers 3:30pm-9pm rush with margin)
+# The aggregator detects EDT vs EST automatically using Python's
+# DST calendar rules and adjusts the fetch window accordingly.
 #
-#   Morning summary:  15:00 UTC
-#     EDT: 11:00am ET  (30 min after rush window closes)
-#     EST: 10:00am ET  (30 min after rush window closes)
-#
-#   Evening summary:  02:00 UTC
-#     EDT: 10:00pm ET  (30 min after rush window closes)
-#     EST:  9:00pm ET  (30 min after rush window closes)
-#
-# Monthly usage: ~630 minutes — well within GitHub's 2,000 free tier.
+# Monthly usage: ~60 minutes — well within GitHub's 2,000 free tier.
 
 name: NJT Delay Tracker
 
 on:
   schedule:
-    # Morning collect: every 15 min, 08:00-14:45 UTC (covers EDT and EST rush)
-    - cron: "*/15 8-14 * * 1-5"
-
-    # Evening collect: every 15 min, 19:00-23:45 UTC
-    - cron: "*/15 19-23 * * 1-5"
-
-    # Evening collect continued: 00:00-01:45 UTC next day
-    - cron: "*/15 0-1 * * 2-6"
-
     # Morning summary: 15:00 UTC (11am EDT / 10am EST)
     - cron: "0 15 * * 1-5"
-
     # Evening summary: 02:00 UTC (10pm EDT / 9pm EST)
     - cron: "0 2 * * 2-6"
 
   # Manual trigger for testing
   workflow_dispatch:
     inputs:
-      mode:
-        description: "collect or summarize"
-        required: false
-        default: "collect"
-        type: choice
-        options: ["collect", "summarize"]
       period:
-        description: "morning or evening (only used when mode=summarize)"
+        description: "morning or evening"
         required: false
         default: "morning"
         type: choice
@@ -57,14 +34,14 @@ on:
       dry_run:
         description: "Dry run (no posting or logging)?"
         required: false
-        default: "false"
+        default: "true"
         type: choice
-        options: ["false", "true"]
+        options: ["true", "false"]
 
 jobs:
   run-tracker:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -79,57 +56,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Work out which mode we're in.
-      # Manual runs use workflow_dispatch inputs.
-      # Scheduled runs detect mode by checking if current UTC time
-      # matches either summary window (with a 10-minute tolerance).
-      - name: Determine mode and period
-        id: mode
+      # Determine period from schedule or manual input
+      - name: Determine period
+        id: config
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
             echo "period=${{ github.event.inputs.period }}" >> $GITHUB_OUTPUT
             echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
           else
             HOUR=$(date -u +%H)
-            MINUTE=$(date -u +%M)
-            echo "UTC time: ${HOUR}:${MINUTE}"
-
-            # Morning summary window: 14:55-15:05 UTC
-            if [ "$HOUR" = "15" ] && [ "$MINUTE" -le 5 ]; then
-              echo "mode=summarize" >> $GITHUB_OUTPUT
+            echo "UTC hour: ${HOUR}"
+            if [ "$HOUR" = "15" ]; then
               echo "period=morning" >> $GITHUB_OUTPUT
-            elif [ "$HOUR" = "14" ] && [ "$MINUTE" -ge 55 ]; then
-              echo "mode=summarize" >> $GITHUB_OUTPUT
-              echo "period=morning" >> $GITHUB_OUTPUT
-            # Evening summary window: 01:55-02:05 UTC
-            elif [ "$HOUR" = "2" ] && [ "$MINUTE" -le 5 ]; then
-              echo "mode=summarize" >> $GITHUB_OUTPUT
-              echo "period=evening" >> $GITHUB_OUTPUT
-            elif [ "$HOUR" = "1" ] && [ "$MINUTE" -ge 55 ]; then
-              echo "mode=summarize" >> $GITHUB_OUTPUT
-              echo "period=evening" >> $GITHUB_OUTPUT
             else
-              echo "mode=collect" >> $GITHUB_OUTPUT
-              echo "period=morning" >> $GITHUB_OUTPUT
+              echo "period=evening" >> $GITHUB_OUTPUT
             fi
             echo "dry_run=false" >> $GITHUB_OUTPUT
           fi
-
-      # Restore both state files from cache
-      - name: Restore seen alerts cache
-        uses: actions/cache@v4
-        with:
-          path: data/seen_alerts.json
-          key: seen-alerts-${{ github.run_id }}
-          restore-keys: seen-alerts-
-
-      - name: Restore delay log cache
-        uses: actions/cache@v4
-        with:
-          path: data/delay_log.json
-          key: delay-log-${{ github.run_id }}
-          restore-keys: delay-log-
 
       # Run the pipeline
       - name: Run pipeline
@@ -139,9 +82,8 @@ jobs:
           BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-          MODE: ${{ steps.mode.outputs.mode }}
-          PERIOD: ${{ steps.mode.outputs.period }}
-          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          PERIOD: ${{ steps.config.outputs.period }}
+          DRY_RUN: ${{ steps.config.outputs.dry_run }}
         run: |
-          echo "MODE=$MODE | PERIOD=$PERIOD | DRY_RUN=$DRY_RUN"
+          echo "PERIOD=$PERIOD | DRY_RUN=$DRY_RUN"
           python src/main.py
