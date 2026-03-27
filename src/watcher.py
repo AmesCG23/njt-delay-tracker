@@ -10,6 +10,10 @@ No continuous polling, no state file, no cache needed.
 Since Bluesky stores all posts permanently, we can always reach back
 and retrieve everything posted during the rush window — no need to
 collect in real time.
+
+Each returned delay dict has a "system_wide" boolean flag.
+System-wide Penn Station alerts are routed to a different cost
+calculation in main.py — see calculator.calculate_system_wide_cost().
 """
 
 import re
@@ -48,6 +52,10 @@ RAIL_LINE_SIGNALS = [
     "atlantic city rail",
     "gladstone",
     "train #", "train#",
+    # System-wide alerts don't name a line but do name Penn Station
+    "penn station",
+    "psny",
+    "rail service",
 ]
 
 
@@ -99,16 +107,10 @@ def in_window(ts_str, window_start_utc, window_end_utc):
     return window_start_utc <= dt <= window_end_utc
 
 
-def is_rail_delay(text):
-    text_lower = text.lower()
-    has_delay = any(kw in text_lower for kw in DELAY_KEYWORDS)
-    has_rail = any(sig in text_lower for sig in RAIL_LINE_SIGNALS)
-    return has_delay and has_rail
-
-
 def extract_delay_minutes(text):
+    """Try to extract delay duration from post text. Returns int or None."""
     patterns = [
-        r"up to (\d+)\s*min",
+        r"up to (\d+)[- ]min",
         r"(\d+)\s*min(?:utes?)?\s*late",
         r"(\d+)\s*min(?:utes?)?\s*delay",
         r"delayed?\s*(?:by\s*)?(?:up to\s*)?(\d+)\s*min",
@@ -120,7 +122,64 @@ def extract_delay_minutes(text):
     return None
 
 
+def is_system_wide_alert(text):
+    """
+    Returns True if this post describes a system-wide Penn Station delay
+    affecting all inbound/outbound trains — not a single named train.
+
+    These are routed to calculate_system_wide_cost() instead of the
+    normal per-train calculator. Only fires for delays >= 15 minutes.
+
+    Examples that match:
+      "NJ TRANSIT rail service is subject to up to 20-minute delays
+       into and out of Penn Station New York."
+      "Due to Amtrak signal issues, service is subject to up to 15-min
+       delays into and out of PSNY."
+    """
+    text_lower = text.lower()
+
+    # Must mention Penn Station
+    has_penn = any(sig in text_lower for sig in [
+        "penn station", "psny", "penn station new york"
+    ])
+    if not has_penn:
+        return False
+
+    # Must describe a system-wide condition, not a specific train
+    system_patterns = [
+        r"rail service is subject to",
+        r"service is subject to",
+        r"subject to up to",
+        r"delays into and out",
+        r"delays in and out",
+        r"into and out of penn",
+        r"in and out of penn",
+        r"all (nj transit )?trains",
+        r"rail service.{0,40}delay",
+        r"service.{0,40}delay.{0,40}penn",
+    ]
+    has_system = any(re.search(p, text_lower) for p in system_patterns)
+    if not has_system:
+        return False
+
+    # Must be 15 minutes or more to qualify
+    delay_minutes = extract_delay_minutes(text)
+    if delay_minutes is None or delay_minutes < 15:
+        return False
+
+    return True
+
+
+def is_rail_delay(text):
+    """Returns True if this post is about a qualifying rail delay."""
+    text_lower = text.lower()
+    has_delay = any(kw in text_lower for kw in DELAY_KEYWORDS)
+    has_rail = any(sig in text_lower for sig in RAIL_LINE_SIGNALS)
+    return has_delay and has_rail
+
+
 def identify_line(text, line_hint=None):
+    """Identify the rail line from post text."""
     text_lower = text.lower()
     line_map = {
         "northeast corridor": "Northeast Corridor",
@@ -154,10 +213,11 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
     Fetch all qualifying rail delay posts from the configured Bluesky accounts
     that fall within the given UTC time window.
 
-    Returns a list of delay dicts ready for the interpreter.
-    No state file. No deduplication by URI — each run is self-contained.
-    Cross-account text deduplication is applied so the same alert posted
-    by two accounts counts once.
+    Returns a list of delay dicts. Each dict has a "system_wide" boolean:
+      - system_wide=True:  Penn Station system-wide alert >= 15 min
+                           → routed to calculate_system_wide_cost()
+      - system_wide=False: normal per-train alert
+                           → routed to interpret_alert() + calculate_cost()
     """
     print(f"[WATCHER] Fetching posts from {window_start_utc.strftime('%H:%M')} "
           f"to {window_end_utc.strftime('%H:%M')} UTC...")
@@ -172,7 +232,26 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
         for uri, text, created_at in posts:
             if not in_window(created_at, window_start_utc, window_end_utc):
                 continue
-            if not text or not is_rail_delay(text):
+            if not text:
+                continue
+
+            # Check for system-wide alert first
+            if is_system_wide_alert(text):
+                delay_minutes = extract_delay_minutes(text)
+                candidates.append({
+                    "text": text,
+                    "line": "System-Wide (Penn Station)",
+                    "delay_minutes": delay_minutes,
+                    "timestamp": created_at,
+                    "source": f"@{handle}",
+                    "system_wide": True,
+                })
+                in_window_count += 1
+                print(f"[WATCHER] SYSTEM-WIDE: {delay_minutes} min | {text[:80]}...")
+                continue
+
+            # Normal per-train rail delay
+            if not is_rail_delay(text):
                 continue
 
             delay_minutes = extract_delay_minutes(text)
@@ -186,6 +265,7 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
                 "delay_minutes": delay_minutes,
                 "timestamp": created_at,
                 "source": f"@{handle}",
+                "system_wide": False,
             })
             in_window_count += 1
 
@@ -203,6 +283,10 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
     dupes = len(candidates) - len(deduplicated)
     if dupes:
         print(f"[WATCHER] Removed {dupes} cross-account duplicate(s).")
-    print(f"[WATCHER] {len(deduplicated)} unique qualifying posts found.")
+
+    system_wide_count = sum(1 for d in deduplicated if d["system_wide"])
+    normal_count = len(deduplicated) - system_wide_count
+    print(f"[WATCHER] {normal_count} normal + {system_wide_count} system-wide = "
+          f"{len(deduplicated)} unique qualifying posts.")
 
     return deduplicated

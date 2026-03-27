@@ -137,3 +137,52 @@ if __name__ == "__main__":
         if result:
             print(json.dumps(result, indent=2))
             print()
+
+
+# ── System-wide Penn Station throughput ───────────────────────────────────────
+# ~40,000 inbound passengers during the 5-hour morning rush = 8,000/hr.
+# Same figure used for evening outbound (comparable volume).
+# Assumption: system-wide alerts last 1 hour unless text says otherwise.
+# Disclosed in methodology as an estimated upper-bound figure.
+PENN_STATION_RIDERS_PER_HOUR = 8000
+SYSTEM_WIDE_ASSUMED_DURATION_MINUTES = 60
+
+
+def calculate_system_wide_cost(raw_delay):
+    """
+    Calculate the cost of a system-wide Penn Station delay event.
+
+    Uses Penn Station throughput × assumed 1-hour duration × VTTS rate,
+    rather than a per-train rider count.
+
+    Returns an enriched dict with the same shape as calculate_cost()
+    so it flows cleanly into the aggregator and logger.
+    """
+    delay_minutes = raw_delay.get("delay_minutes")
+    if delay_minutes is None:
+        print("[CALCULATOR] System-wide alert has no parseable delay duration — skipping.")
+        return None
+
+    # Cost = throughput/hr × (delay_min / 60) × assumed_duration_hr × VTTS
+    # Simplified: throughput × (delay_minutes / 60) × VTTS
+    # (The 1-hour duration assumption means we use throughput as the rider count)
+    riders = PENN_STATION_RIDERS_PER_HOUR
+    hours_delayed = delay_minutes / 60
+    dollar_estimate = round(riders * hours_delayed * VTTS_RATE, 2)
+
+    result = dict(raw_delay)
+    result["estimated_riders"] = riders
+    result["dollar_estimate"] = dollar_estimate
+    result["vtts_rate_used"] = VTTS_RATE
+    result["train_number"] = None
+    result["is_cancellation"] = False
+    result["cause"] = "system-wide signal/infrastructure issue"
+    result["direction"] = "both"
+    result["time_band"] = "peak"
+    result["system_wide_assumed_duration_minutes"] = SYSTEM_WIDE_ASSUMED_DURATION_MINUTES
+    result["cancellation_assumed_delay"] = False
+
+    print(f"[CALCULATOR] SYSTEM-WIDE | {delay_minutes} min | "
+          f"~{riders:,} riders/hr × 1hr | ${dollar_estimate:,.2f}")
+
+    return result

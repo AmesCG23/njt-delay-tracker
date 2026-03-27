@@ -1,20 +1,20 @@
 """
 main.py — Single-Pass Pipeline
 --------------------------------
-Runs once at summary time (10:30am or 9:00pm ET, triggered by GitHub Actions).
+Runs once at summary time (10:30am or 9:00pm ET).
 
 Steps:
-  1. Determine the time window for this period (morning or evening rush)
+  1. Determine the time window for this period
   2. Fetch all qualifying delay posts from Bluesky for that window
-  3. Interpret each post via Claude Haiku
-  4. Calculate cost per event
-  5. Deduplicate by train number (keep highest delay per train)
-  6. Calculate totals
-  7. Log all events to Google Sheets
-  8. Post summary to Bluesky
-
-No staging file. No collect/summarize split. No cache needed beyond
-seen_alerts (which is no longer needed either — each run is self-contained).
+  3. Route each post:
+       a. System-wide Penn Station alerts (>= 15 min)
+          → calculate_system_wide_cost() directly (no interpreter needed)
+       b. Normal per-train alerts
+          → interpret_alert() → calculate_cost()
+  4. Deduplicate normal events by train number
+  5. Calculate totals across all events
+  6. Log all events to Google Sheets
+  7. Post summary to Bluesky
 """
 
 import sys
@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from watcher import get_window_delays
 from interpreter import interpret_alert
-from calculator import calculate_cost
+from calculator import calculate_cost, calculate_system_wide_cost
 from logger import log_delay
 from aggregator import get_utc_window, deduplicate_by_train, calculate_totals, format_summary_post
 
@@ -71,7 +71,7 @@ def run():
         traceback.print_exc()
         return
 
-    # ── Step 2: Fetch qualifying Bluesky posts for this window ────────────────
+    # ── Step 2: Fetch qualifying Bluesky posts ────────────────────────────────
     try:
         raw_delays = get_window_delays(window_start, window_end,
                                        min_delay_minutes=MIN_DELAY_MINUTES)
@@ -86,12 +86,24 @@ def run():
 
     print(f"\n[MAIN] Processing {len(raw_delays)} posts...\n")
 
-    # ── Steps 3 & 4: Interpret and calculate each event ───────────────────────
+    # ── Step 3: Route and calculate each event ────────────────────────────────
     calculated_delays = []
 
     for i, raw in enumerate(raw_delays, 1):
         print(f"--- {i}/{len(raw_delays)} ---")
 
+        # Route A: system-wide Penn Station alert
+        if raw.get("system_wide"):
+            try:
+                calculated = calculate_system_wide_cost(raw)
+                if calculated:
+                    calculated_delays.append(calculated)
+            except Exception as e:
+                print(f"[MAIN] System-wide calculator failed: {e}")
+                traceback.print_exc()
+            continue
+
+        # Route B: normal per-train alert
         try:
             interpreted = interpret_alert(
                 raw["text"],
@@ -122,30 +134,39 @@ def run():
         calculated_delays.append(calculated)
 
     if not calculated_delays:
-        print("[MAIN] No events survived interpretation. Nothing to post.")
+        print("[MAIN] No events survived processing. Nothing to post.")
         return
 
-    # ── Step 5: Deduplicate by train ──────────────────────────────────────────
-    deduplicated = deduplicate_by_train(calculated_delays)
+    # ── Step 4: Deduplicate normal events by train number ─────────────────────
+    # System-wide events are excluded from dedup (no train number) and
+    # added back in afterward.
+    system_wide_events = [e for e in calculated_delays if e.get("system_wide")]
+    normal_events      = [e for e in calculated_delays if not e.get("system_wide")]
 
-    # ── Step 6: Calculate totals ──────────────────────────────────────────────
-    totals = calculate_totals(deduplicated)
+    deduplicated_normal = deduplicate_by_train(normal_events)
+    all_events = deduplicated_normal + system_wide_events
+
+    if system_wide_events:
+        print(f"[MAIN] {len(system_wide_events)} system-wide event(s) added separately.")
+
+    # ── Step 5: Calculate totals ──────────────────────────────────────────────
+    totals = calculate_totals(all_events)
     print(f"\n[MAIN] Totals: {totals['event_count']} events | "
           f"{totals['total_person_minutes']:,} person-min | "
           f"${totals['total_cost']:,.2f}")
 
-    # ── Step 7: Log all events to Google Sheets ───────────────────────────────
+    # ── Step 6: Log all events to Google Sheets ───────────────────────────────
     if not DRY_RUN:
-        for event in deduplicated:
+        for event in all_events:
             try:
                 log_delay(event)
             except Exception as e:
                 print(f"[MAIN] Logger failed for one event: {e}")
                 traceback.print_exc()
     else:
-        print(f"[MAIN] DRY RUN: would log {len(deduplicated)} events to Sheets.")
+        print(f"[MAIN] DRY RUN: would log {len(all_events)} events to Sheets.")
 
-    # ── Step 8: Format and post summary ──────────────────────────────────────
+    # ── Step 7: Format and post summary ──────────────────────────────────────
     post_text = format_summary_post(PERIOD, totals)
 
     print(f"\n[MAIN] Summary post:\n{'-'*40}\n{post_text}\n{'-'*40}")
