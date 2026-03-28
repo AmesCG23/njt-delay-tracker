@@ -11,78 +11,70 @@ No file I/O. Operates purely on the list passed in.
 from calculator import VTTS_RATE
 
 # ── Rush window definitions ───────────────────────────────────────────────────
-# Hours in ET (24h). Used to calculate the UTC window for Bluesky fetching.
 WINDOWS = {
     "morning": {
-        "start_hour_et": 5,
-        "end_hour_et":   10,
-        "end_minute_et": 30,
-        "greeting":      "Good morning",
-        "period_label":  "morning",
+        "greeting":     "Good morning",
+        "period_label": "morning",
+        # Fixed UTC boundaries — morning cron fires at 15:00 UTC, same day
+        # 09:00–14:30 UTC = 5:00am–10:30am EDT = 4:00am–9:30am EST
+        "start_utc_hour":   9,
+        "start_utc_minute": 0,
+        "end_utc_hour":     14,
+        "end_utc_minute":   30,
+        "day_offset":       0,   # same UTC day as when the job fires
     },
     "evening": {
-        "start_hour_et": 15,
-        "end_hour_et":   21,
-        "end_minute_et": 0,
-        "greeting":      "Good evening",
-        "period_label":  "afternoon",
+        "greeting":     "Good evening",
+        "period_label": "afternoon",
+        # Fixed UTC boundaries — evening cron fires at 02:00 UTC, next calendar day
+        # 19:00 UTC (prev day) – 01:00 UTC (today) = 3:00pm–9:00pm EDT = 2:00pm–8:00pm EST
+        "start_utc_hour":   19,
+        "start_utc_minute": 0,
+        "end_utc_hour":     1,
+        "end_utc_minute":   0,
+        "day_offset":       -1,  # start is on the previous UTC day
     },
 }
-
-# ET offset. We use UTC-4 (EDT) as the base; in EST the posts will fire
-# an hour early but the UTC window calculation below accounts for both.
-ET_UTC_OFFSET_EDT = 4   # EDT = UTC-4
-ET_UTC_OFFSET_EST = 5   # EST = UTC-5
 
 
 def get_utc_window(period):
     """
     Return (window_start_utc, window_end_utc) for the given period.
-    Uses the current UTC time to determine whether EDT or EST is in effect,
-    by checking the US DST rules (second Sunday in March through first Sunday
-    in November).
+
+    Uses FIXED UTC boundaries anchored to the cron schedule — NOT the
+    current clock time. This means GitHub Actions delays of any length
+    won't shift the window.
+
+    Morning:  09:00–14:30 UTC on today's UTC date
+    Evening:  19:00 UTC yesterday – 01:00 UTC today
     """
     from datetime import datetime, timezone, timedelta
 
     w = WINDOWS[period]
-
-    # Determine current ET offset using Python's DST-aware approach
     now_utc = datetime.now(timezone.utc)
+    utc_date = now_utc.date()
 
-    # Use the America/New_York timezone via timedelta approximation:
-    # DST starts second Sunday of March, ends first Sunday of November.
-    # Python's calendar module makes this easy.
-    import calendar
+    if period == "morning":
+        start_date = utc_date
+        end_date   = utc_date
+    else:  # evening — start is on the previous UTC calendar day
+        start_date = utc_date - timedelta(days=1)
+        end_date   = utc_date
 
-    year = now_utc.year
+    start_utc = datetime(
+        start_date.year, start_date.month, start_date.day,
+        w["start_utc_hour"], w["start_utc_minute"], 0,
+        tzinfo=timezone.utc
+    )
+    end_utc = datetime(
+        end_date.year, end_date.month, end_date.day,
+        w["end_utc_hour"], w["end_utc_minute"], 0,
+        tzinfo=timezone.utc
+    )
 
-    # Second Sunday in March
-    march_days = [d for d in range(1, 32)
-                  if datetime(year, 3, d).weekday() == 6]
-    dst_start = datetime(year, 3, march_days[1], 2, 0, 0, tzinfo=timezone.utc) + timedelta(hours=5)
-
-    # First Sunday in November
-    nov_days = [d for d in range(1, 8)
-                if datetime(year, 11, d).weekday() == 6]
-    dst_end = datetime(year, 11, nov_days[0], 2, 0, 0, tzinfo=timezone.utc) + timedelta(hours=6)
-
-    is_edt = dst_start <= now_utc < dst_end
-    offset = ET_UTC_OFFSET_EDT if is_edt else ET_UTC_OFFSET_EST
-
-    print(f"[AGGREGATOR] Timezone: {'EDT' if is_edt else 'EST'} (UTC-{offset})")
-
-    # Build the UTC window
-    today = (now_utc - timedelta(hours=offset)).date()
-    start_et_naive = datetime(today.year, today.month, today.day,
-                               w["start_hour_et"], 0, 0)
-    end_et_naive   = datetime(today.year, today.month, today.day,
-                               w["end_hour_et"], w["end_minute_et"], 0)
-
-    start_utc = start_et_naive.replace(tzinfo=timezone.utc) + timedelta(hours=offset)
-    end_utc   = end_et_naive.replace(tzinfo=timezone.utc)   + timedelta(hours=offset)
-
-    print(f"[AGGREGATOR] Window: {start_utc.strftime('%H:%M')}–{end_utc.strftime('%H:%M')} UTC "
-          f"({w['start_hour_et']}:00–{w['end_hour_et']}:{w['end_minute_et']:02d} ET)")
+    print(f"[AGGREGATOR] {period.upper()} window: "
+          f"{start_utc.strftime('%Y-%m-%d %H:%M')} – "
+          f"{end_utc.strftime('%Y-%m-%d %H:%M')} UTC")
 
     return start_utc, end_utc
 
@@ -149,7 +141,7 @@ def calculate_totals(deduplicated_delays):
 
         total_person_minutes += delay_mins * riders
         total_cost           += riders * (delay_mins / 60) * VTTS_RATE
-        if line != "Unknown":
+        if line not in ("Unknown", "System-Wide (Penn Station)"):
             lines.add(line)
 
     return {
