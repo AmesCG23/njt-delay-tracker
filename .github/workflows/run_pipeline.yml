@@ -1,15 +1,14 @@
 # .github/workflows/run_pipeline.yml
 #
 # Two scheduled jobs — one for each rush hour summary.
-# Each job runs once, fetches the full window of Bluesky posts,
-# interprets, calculates, and posts. No continuous polling needed.
 #
-# Times (UTC):
-#   Morning summary: 15:00 UTC = 11:00am EDT / 10:00am EST
-#   Evening summary: 02:00 UTC = 10:00pm EDT /  9:00pm EST
+# UTC windows (fixed, not calculated from current time):
+#   Morning: 09:00–14:30 UTC = 5:00am–10:30am EDT / 4:00am–9:30am EST
+#   Evening: 19:00–01:00 UTC = 3:00pm–9:00pm EDT / 2:00pm–8:00pm EST
 #
-# The aggregator detects EDT vs EST automatically using Python's
-# DST calendar rules and adjusts the fetch window accordingly.
+# Period is detected via github.event.schedule (the exact cron string),
+# NOT from the current clock hour. This means GitHub delays of any length
+# won't cause misclassification.
 #
 # Monthly usage: ~60 minutes — well within GitHub's 2,000 free tier.
 
@@ -18,11 +17,10 @@ name: NJT Delay Tracker
 on:
   schedule:
     # Morning summary: 15:00 UTC (11am EDT / 10am EST)
-    - cron: "0 15 * * 1-5"
+    - cron: "0 15 * * *"
     # Evening summary: 02:00 UTC (10pm EDT / 9pm EST)
-    - cron: "0 2 * * 2-6"
+    - cron: "0 2 * * *"
 
-  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       period:
@@ -56,25 +54,23 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Determine period from schedule or manual input
+      # Determine period using github.event.schedule (the cron string that
+      # fired this run), NOT the current clock hour. This is immune to
+      # GitHub Actions delays of any length.
       - name: Determine period
         id: config
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "period=${{ github.event.inputs.period }}" >> $GITHUB_OUTPUT
             echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 15 * * 1-5" ]; then
+            echo "period=morning" >> $GITHUB_OUTPUT
+            echo "dry_run=false" >> $GITHUB_OUTPUT
           else
-            HOUR=$(date -u +%H)
-            echo "UTC hour: ${HOUR}"
-            if [ "$HOUR" = "15" ]; then
-              echo "period=morning" >> $GITHUB_OUTPUT
-            else
-              echo "period=evening" >> $GITHUB_OUTPUT
-            fi
+            echo "period=evening" >> $GITHUB_OUTPUT
             echo "dry_run=false" >> $GITHUB_OUTPUT
           fi
 
-      # Run the pipeline
       - name: Run pipeline
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
