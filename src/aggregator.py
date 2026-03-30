@@ -25,7 +25,7 @@ WINDOWS = {
     },
     "evening": {
         "greeting":     "Good evening",
-        "period_label": "afternoon",
+        "period_label": "evening",
         # Fixed UTC boundaries — evening cron fires at 02:00 UTC, next calendar day
         # 19:00 UTC (prev day) – 01:00 UTC (today) = 3:00pm–9:00pm EDT = 2:00pm–8:00pm EST
         "start_utc_hour":   19,
