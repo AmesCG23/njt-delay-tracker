@@ -164,3 +164,55 @@ if __name__ == "__main__":
 
     running_total = log_delay(test_delay)
     print(f"Running total: ${running_total:,.2f}" if running_total else "Could not read running total.")
+
+
+TWEET_LOG_TAB = "Tweet_log"
+
+
+def log_tweet(text, total_cost, event_count, uri=None):
+    """
+    Append the daily summary tweet to the Tweet_log tab.
+    Creates the tab and headers automatically if they don't exist.
+
+    Columns: Timestamp | Tweet Text | Total Cost Estimate | Number of Delay Events | Post URI
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        # Get or create Tweet_log tab
+        try:
+            tweet_tab = spreadsheet.worksheet(TWEET_LOG_TAB)
+        except gspread.WorksheetNotFound:
+            tweet_tab = spreadsheet.add_worksheet(TWEET_LOG_TAB, rows=500, cols=6)
+
+        # Add headers if the sheet is empty
+        existing = tweet_tab.row_values(1)
+        expected_headers = [
+            "Timestamp",
+            "Tweet Text",
+            "Total Cost Estimate",
+            "Number of Delay Events",
+            "Post URI",
+        ]
+        if existing != expected_headers:
+            tweet_tab.update("A1", [expected_headers])
+
+        # Append the row
+        row = [
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            text,
+            f"${total_cost:,.2f}",
+            event_count,
+            uri or "",
+        ]
+        tweet_tab.append_row(row, value_input_option="USER_ENTERED")
+        print(f"[LOGGER] Tweet logged to {TWEET_LOG_TAB} tab.")
+
+    except Exception as e:
+        print(f"[LOGGER] Failed to log tweet: {e}")
+        raise
