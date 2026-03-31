@@ -300,6 +300,22 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
             if not text:
                 continue
 
+            # Ignore bus and light rail alerts.
+            # We check for "light rail" anywhere, but for "bus" we require it
+            # to appear as part of a bus-specific phrase so we don't accidentally
+            # drop rail alerts that mention a bus connection in passing.
+            text_lower_check = text.lower()
+            is_bus_alert = (
+                text_lower_check.startswith("bus ") or
+                "bus service" in text_lower_check or
+                "bus route" in text_lower_check or
+                "nj transit bus" in text_lower_check or
+                "njt bus" in text_lower_check or
+                "bus detour" in text_lower_check
+            )
+            if "light rail" in text_lower_check or is_bus_alert:
+                continue
+
             # Check for Penn Station system-wide alert first
             if is_system_wide_alert(text):
                 delay_minutes = extract_delay_minutes(text)

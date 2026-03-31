@@ -148,17 +148,12 @@ def run():
         print("[MAIN] No events survived processing. Nothing to post.")
         return
 
-    # ── Step 4: Deduplicate normal events by train number ─────────────────────
-    # System-wide events are excluded from dedup (no train number) and
-    # added back in afterward.
-    system_wide_events = [e for e in calculated_delays if e.get("system_wide")]
-    normal_events      = [e for e in calculated_delays if not e.get("system_wide")]
-
-    deduplicated_normal = deduplicate_by_train(normal_events)
-    all_events = deduplicated_normal + system_wide_events
-
-    if system_wide_events:
-        print(f"[MAIN] {len(system_wide_events)} system-wide event(s) added separately.")
+    # ── Step 4: Deduplicate all events ───────────────────────────────────────
+    # deduplicate_by_train handles all three cases:
+    #   - normal trains: by (train_number, date), keep highest delay
+    #   - system-wide events: by (line, date), keep highest cost
+    #   - unidentifiable: kept as-is
+    all_events = deduplicate_by_train(calculated_delays)
 
     # ── Step 5: Calculate totals ──────────────────────────────────────────────
     totals = calculate_totals(all_events)
