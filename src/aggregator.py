@@ -57,9 +57,17 @@ def get_utc_window(period):
     if period == "morning":
         start_date = utc_date
         end_date   = utc_date
-    else:  # evening — start is on the previous UTC calendar day
-        start_date = utc_date - timedelta(days=1)
-        end_date   = utc_date
+    else:
+        # Evening job is scheduled at 23:59 UTC (same day as rush).
+        # If GitHub fires it on time:  hour=23 → start=today, end=tomorrow
+        # If GitHub delays past midnight: hour=0-11 → start=yesterday, end=today
+        # Either way the window is 19:00 UTC rush-day → 01:00 UTC next-day.
+        if now_utc.hour >= 12:
+            start_date = utc_date
+            end_date   = utc_date + timedelta(days=1)
+        else:
+            start_date = utc_date - timedelta(days=1)
+            end_date   = utc_date
 
     start_utc = datetime(
         start_date.year, start_date.month, start_date.day,

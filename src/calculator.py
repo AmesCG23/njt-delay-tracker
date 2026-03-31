@@ -186,3 +186,70 @@ def calculate_system_wide_cost(raw_delay):
           f"~{riders:,} riders/hr × 1hr | ${dollar_estimate:,.2f}")
 
     return result
+
+
+# ── Trains per hour (peak) by line ────────────────────────────────────────────
+# Approximate peak-hour train frequency based on published NJT timetables.
+# Used to calculate line-wide suspension impact: riders/train × trains/hr.
+TRAINS_PER_HOUR_PEAK = {
+    "Northeast Corridor": 8,
+    "North Jersey Coast":  4,
+    "Morris & Essex":      5,
+    "Montclair-Boonton":   3,
+    "Main/Bergen County":  4,
+    "Raritan Valley":      4,
+    "Pascack Valley":      2,
+    "Port Jervis":         2,
+    "Gladstone Branch":    2,
+    "Atlantic City":       2,
+    "Unknown":             3,
+}
+
+# Assumed duration for a line suspension (minutes).
+LINE_SUSPENSION_ASSUMED_DURATION_MINUTES = 60
+
+
+def calculate_line_suspension_cost(raw_delay):
+    """
+    Calculate the cost of a full line suspension.
+
+    Uses: riders_per_train × trains_per_hour × 1hr assumed duration × VTTS_RATE
+    This gives riders affected per hour, comparable to the Penn Station
+    throughput approach used for system-wide Penn alerts.
+
+    A line suspension of M&E (550 riders × 5 trains/hr × $24) = $66,000.
+    An NEC suspension (825 × 8 × $24) = $158,400.
+    """
+    line = raw_delay.get("line", "Unknown")
+
+    riders_per_train = RIDERS_PER_TRAIN.get(line)
+    if riders_per_train is None:
+        for key in RIDERS_PER_TRAIN:
+            if key.lower() in line.lower() or line.lower() in key.lower():
+                riders_per_train = RIDERS_PER_TRAIN[key]
+                break
+        if riders_per_train is None:
+            riders_per_train = RIDERS_PER_TRAIN["Unknown"]
+
+    trains_per_hour = TRAINS_PER_HOUR_PEAK.get(line, TRAINS_PER_HOUR_PEAK["Unknown"])
+    riders_per_hour = riders_per_train * trains_per_hour
+    dollar_estimate = round(riders_per_hour * VTTS_RATE, 2)
+
+    result = dict(raw_delay)
+    result["delay_minutes"] = LINE_SUSPENSION_ASSUMED_DURATION_MINUTES
+    result["estimated_riders"] = riders_per_hour
+    result["dollar_estimate"] = dollar_estimate
+    result["vtts_rate_used"] = VTTS_RATE
+    result["train_number"] = None
+    result["is_cancellation"] = False
+    result["cause"] = "full line suspension"
+    result["direction"] = "both"
+    result["time_band"] = "peak"
+    result["line_suspension_assumed_duration_minutes"] = LINE_SUSPENSION_ASSUMED_DURATION_MINUTES
+    result["cancellation_assumed_delay"] = False
+
+    print(f"[CALCULATOR] LINE SUSPENSION: {line} | "
+          f"{riders_per_train} riders/train × {trains_per_hour} trains/hr | "
+          f"${dollar_estimate:,.2f}")
+
+    return result

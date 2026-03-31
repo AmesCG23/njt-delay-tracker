@@ -157,14 +157,77 @@ def is_system_wide_alert(text):
         r"all (nj transit )?trains",
         r"rail service.{0,40}delay",
         r"service.{0,40}delay.{0,40}penn",
+        r"service.{0,30}suspend",
+        r"suspend.{0,30}service",
+        r"trains are suspended",
+        r"no (rail )?service",
     ]
     has_system = any(re.search(p, text_lower) for p in system_patterns)
     if not has_system:
         return False
 
-    # Must be 15 minutes or more to qualify
+    # For suspension language, delay_minutes may not be parseable —
+    # treat as a 60-minute event (same as cancellation assumption).
+    # For delay language, must be 15 minutes or more to qualify.
     delay_minutes = extract_delay_minutes(text)
+    is_suspension = any(re.search(p, text_lower) for p in [
+        r"suspend", r"no (rail )?service"
+    ])
+    if is_suspension:
+        return True   # always qualifies; duration assumed in calculator
     if delay_minutes is None or delay_minutes < 15:
+        return False
+
+    return True
+
+
+def is_line_suspension_alert(text):
+    """
+    Returns True if this post describes a full line suspension —
+    meaning an entire rail line has been suspended, not just a single train.
+
+    These are treated as catastrophic line-level events: we use that
+    line's riders/hour × 1 hour assumed duration instead of per-train ridership.
+
+    Examples that match:
+      "Morris & Essex service is suspended in both directions due to Portal Bridge."
+      "NEC service has been suspended between Newark and New York."
+      "North Jersey Coast Line service is suspended due to flooding."
+    """
+    text_lower = text.lower()
+
+    # Must mention suspension (not just a delay)
+    has_suspension = any(re.search(p, text_lower) for p in [
+        r"service is suspended",
+        r"service has been suspended",
+        r"service suspended",
+        r"trains? (are|have been) suspended",
+        r"suspended.{0,50}(both directions|all service|rail service)",
+        r"(both directions|all service|rail service).{0,50}suspended",
+    ])
+    if not has_suspension:
+        return False
+
+    # Must mention a specific rail line (not a Penn-wide alert — those
+    # are handled by is_system_wide_alert)
+    line_signals = [
+        "northeast corridor", "nec ",
+        "north jersey coast", "njcl",
+        "morris & essex", "morris and essex",
+        "montclair-boonton", "montclair boonton", "mobo",
+        "main/bergen", "main bergen", "mbpj",
+        "raritan valley", "rvl",
+        "pascack valley", "pvl",
+        "port jervis",
+        "atlantic city rail",
+        "gladstone",
+    ]
+    has_line = any(sig in text_lower for sig in line_signals)
+    if not has_line:
+        return False
+
+    # Exclude if it's actually a Penn-wide alert (handled separately)
+    if any(s in text_lower for s in ["penn station", "psny"]):
         return False
 
     return True
@@ -235,7 +298,7 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
             if not text:
                 continue
 
-            # Check for system-wide alert first
+            # Check for Penn Station system-wide alert first
             if is_system_wide_alert(text):
                 delay_minutes = extract_delay_minutes(text)
                 candidates.append({
@@ -247,7 +310,23 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
                     "system_wide": True,
                 })
                 in_window_count += 1
-                print(f"[WATCHER] SYSTEM-WIDE: {delay_minutes} min | {text[:80]}...")
+                print(f"[WATCHER] PENN SYSTEM-WIDE: {delay_minutes} min | {text[:80]}...")
+                continue
+
+            # Check for line-level suspension
+            if is_line_suspension_alert(text):
+                line = identify_line(text, line_hint=line_hint)
+                candidates.append({
+                    "text": text,
+                    "line": line,
+                    "delay_minutes": None,   # no duration — assumed in calculator
+                    "timestamp": created_at,
+                    "source": f"@{handle}",
+                    "system_wide": True,
+                    "line_suspension": True,
+                })
+                in_window_count += 1
+                print(f"[WATCHER] LINE SUSPENSION: {line} | {text[:80]}...")
                 continue
 
             # Normal per-train rail delay

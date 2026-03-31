@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from watcher import get_window_delays
 from interpreter import interpret_alert
-from calculator import calculate_cost, calculate_system_wide_cost
+from calculator import calculate_cost, calculate_system_wide_cost, calculate_line_suspension_cost
 from logger import log_delay
 from aggregator import get_utc_window, deduplicate_by_train, calculate_totals, format_summary_post
 
@@ -92,14 +92,25 @@ def run():
     for i, raw in enumerate(raw_delays, 1):
         print(f"--- {i}/{len(raw_delays)} ---")
 
-        # Route A: system-wide Penn Station alert
-        if raw.get("system_wide"):
+        # Route A1: Penn Station system-wide alert
+        if raw.get("system_wide") and not raw.get("line_suspension"):
             try:
                 calculated = calculate_system_wide_cost(raw)
                 if calculated:
                     calculated_delays.append(calculated)
             except Exception as e:
-                print(f"[MAIN] System-wide calculator failed: {e}")
+                print(f"[MAIN] Penn system-wide calculator failed: {e}")
+                traceback.print_exc()
+            continue
+
+        # Route A2: line-wide suspension
+        if raw.get("line_suspension"):
+            try:
+                calculated = calculate_line_suspension_cost(raw)
+                if calculated:
+                    calculated_delays.append(calculated)
+            except Exception as e:
+                print(f"[MAIN] Line suspension calculator failed: {e}")
                 traceback.print_exc()
             continue
 
