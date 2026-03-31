@@ -89,41 +89,57 @@ def get_utc_window(period):
 
 def deduplicate_by_train(delays):
     """
-    Keep only the highest observed delay per (train_number, date) pair.
-    Trains without a number are kept as-is.
+    Keep only the highest observed delay per event key:
+
+    - Normal events:       keyed on (train_number, date) — highest delay wins
+    - System-wide events:  keyed on (line, date) — highest cost wins
+      This prevents the same Penn Station or line-suspension alert from
+      being counted multiple times if it escalates or fires repeatedly.
+    - Events with no train number and not system-wide: kept as-is
     """
     from datetime import datetime, timezone, timedelta
 
-    best = {}
-    no_train = []
+    best_trains = {}    # (train_number, date) → entry
+    best_syswide = {}   # (line, date) → entry  for system-wide events
+    no_id = []          # no train number, not system-wide
 
     for entry in delays:
         train = entry.get("train_number")
-        if not train:
-            no_train.append(entry)
-            continue
+        is_system = entry.get("system_wide", False)
 
         try:
-            ts = datetime.fromisoformat(
-                entry["timestamp"].replace("Z", "+00:00")
-            )
+            ts_str = entry.get("timestamp", "")
+            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             date_str = (ts - timedelta(hours=4)).strftime("%Y-%m-%d")
         except (ValueError, TypeError, AttributeError):
             date_str = "unknown"
 
-        key = (str(train).strip(), date_str)
-        this_mins = entry.get("delay_minutes") or 0
-        existing_mins = (best[key].get("delay_minutes") or 0) if key in best else 0
+        if is_system:
+            # Dedup system-wide events by (line, date), keep highest cost
+            line = entry.get("line", "Unknown")
+            key = (line, date_str)
+            this_cost = entry.get("dollar_estimate") or 0
+            existing_cost = (best_syswide[key].get("dollar_estimate") or 0) if key in best_syswide else 0
+            if key not in best_syswide or this_cost > existing_cost:
+                best_syswide[key] = entry
 
-        if key not in best or this_mins > existing_mins:
-            best[key] = entry
+        elif train:
+            # Normal per-train dedup: keep highest delay
+            key = (str(train).strip(), date_str)
+            this_mins = entry.get("delay_minutes") or 0
+            existing_mins = (best_trains[key].get("delay_minutes") or 0) if key in best_trains else 0
+            if key not in best_trains or this_mins > existing_mins:
+                best_trains[key] = entry
 
-    result = list(best.values()) + no_train
+        else:
+            no_id.append(entry)
+
+    result = list(best_trains.values()) + list(best_syswide.values()) + no_id
     deduped = len(delays) - len(result)
     if deduped:
-        print(f"[AGGREGATOR] Deduplicated {deduped} repeat update(s), keeping highest per train.")
+        print(f"[AGGREGATOR] Deduplicated {deduped} repeat update(s), keeping highest per train/event.")
     return result
 
 

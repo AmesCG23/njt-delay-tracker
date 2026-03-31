@@ -63,7 +63,10 @@ Rules:
 - Inbound = arriving at Penn Station or Hoboken Terminal
 - Outbound = departing Penn Station or Hoboken Terminal, going to NJ
 - If the alert says "on or close to schedule" or "normal service", return null for the whole thing
-- Cause should be 3-6 words maximum"""
+- Cause should be 3-6 words maximum
+- Line name abbreviations: NEC = Northeast Corridor, NJCL = North Jersey Coast Line,
+  M&E or M and E or Morris and Essex = Morris & Essex, MOBO = Montclair-Boonton,
+  MBPJ = Main/Bergen County, RVL = Raritan Valley, PVL = Pascack Valley"""
 
     try:
         message = client.messages.create(

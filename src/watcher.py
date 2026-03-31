@@ -43,7 +43,7 @@ DELAY_KEYWORDS = [
 RAIL_LINE_SIGNALS = [
     "northeast corridor", "nec ",
     "north jersey coast", "njcl",
-    "morris & essex", "morris and essex",
+    "morris & essex", "morris and essex", "m and e", "m&e",
     "montclair-boonton", "montclair boonton", "mobo",
     "main/bergen", "main bergen", "mbpj",
     "raritan valley", "rvl",
@@ -213,7 +213,7 @@ def is_line_suspension_alert(text):
     line_signals = [
         "northeast corridor", "nec ",
         "north jersey coast", "njcl",
-        "morris & essex", "morris and essex",
+        "morris & essex", "morris and essex", "m and e", "m&e", "m and e", "m&e",
         "montclair-boonton", "montclair boonton", "mobo",
         "main/bergen", "main bergen", "mbpj",
         "raritan valley", "rvl",
@@ -251,6 +251,8 @@ def identify_line(text, line_hint=None):
         "njcl": "North Jersey Coast",
         "morris & essex": "Morris & Essex",
         "morris and essex": "Morris & Essex",
+        "m and e": "Morris & Essex",
+        "m&e": "Morris & Essex",
         "montclair-boonton": "Montclair-Boonton",
         "montclair boonton": "Montclair-Boonton",
         "mobo": "Montclair-Boonton",
