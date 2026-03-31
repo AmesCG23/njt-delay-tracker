@@ -1,0 +1,42 @@
+# evening.yml — Evening rush summary
+# Fires at 23:59 UTC (targets ~01:59 UTC actual after ~2h GitHub delay)
+# = ~9:59pm EDT / ~8:59pm EST
+# Covers window: 19:00 UTC–01:00 UTC = 3:00pm–9:00pm EDT
+
+name: NJT Evening Summary
+
+on:
+  schedule:
+    - cron: "59 23 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  run-evening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Run evening summary
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          PERIOD: "evening"
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          echo "PERIOD=evening | DRY_RUN=$DRY_RUN"
+          python src/main.py
