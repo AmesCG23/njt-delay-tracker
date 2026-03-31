@@ -1,0 +1,50 @@
+# daily.yml — One daily run, Mon–Fri
+#
+# Scheduled at 19:00 UTC, targeting ~3pm ET actual.
+# With ~2h GitHub delay, expects to fire around 5pm ET — still fine,
+# since we're summarizing YESTERDAY's delays which are fully in the past.
+#
+# What it does:
+#   1. Fetches yesterday morning (5am–noon ET) from Bluesky
+#   2. Interprets, deduplicates, calculates, logs to Sheets
+#   3. Fetches yesterday evening (3pm–9pm ET) from Bluesky
+#   4. Interprets, deduplicates, calculates, logs to Sheets
+#   5. Posts one daily summary tweet
+#   6. Logs the tweet to the Tweet_log tab
+
+name: NJT Daily Pipeline
+
+on:
+  schedule:
+    - cron: "0 19 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no Sheets, no tweet)?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  daily-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Run daily pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          echo "DRY_RUN=$DRY_RUN"
+          python src/daily.py
