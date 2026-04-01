@@ -6,87 +6,157 @@ This file gives Claude instant project context. Paste it at the start of any new
 
 ## What This Project Is
 
-An automated pipeline that monitors NJ Transit commuter rail delays by reading public Bluesky alert bot accounts, estimates the economic cost in lost worker time, logs each event to a Google Sheet, and posts twice-daily summary posts to a Bluesky bot account.
+An automated pipeline that monitors NJ Transit commuter rail delays by reading public Bluesky alert bot accounts, estimates the economic cost in lost worker time, logs each event to a Google Sheet, and posts a once-daily summary to a Bluesky bot account.
 
-Posts go out at **10:30am** (morning rush summary) and **9:00pm** (evening rush summary) on weekdays. Each run is a single self-contained process: fetch, interpret, calculate, aggregate, log, post.
+One post goes out daily at ~3pm ET (targeting 5pm ET actual after GitHub delay), summarizing the **previous day's** complete morning and evening rush delays.
 
 **Owner:** Ames (non-technical background — plain English explanations always, code second)
 
 ---
 
-## Architecture: Single-Pass Pipeline
+## Architecture: Single Daily Pipeline
 
-The pipeline runs **twice a day** via GitHub Actions. There is no continuous polling, no staging file, no collect/summarize split. Each run fetches everything it needs from Bluesky in one shot.
+One workflow fires once per weekday. No staging files, no caching, no collect/summarize split. Bluesky stores all posts permanently so we always reach back and fetch what we need.
 
 ```
-GitHub Actions fires at 15:00 UTC (morning) or 02:00 UTC (evening)
+GitHub Actions fires at 19:00 UTC Mon–Fri (~5pm ET actual after ~2h delay)
        |
        v
-main.py
+daily.py
   |
-  ├── aggregator.get_utc_window(period)
-  |     Calculates the correct UTC time window for the rush hour,
-  |     accounting for EDT vs EST automatically via DST calendar rules.
-  |     IMPORTANT: Uses ET date (not UTC date) to avoid midnight rollover bug.
-  |     Evening job fires at 02:00 UTC = 10pm ET, which is already the
-  |     next calendar day in UTC — fixed by offsetting before taking .date()
+  ├── get_yesterday_windows()
+  |     Calculates yesterday's morning and evening UTC windows.
+  |     "Yesterday" in ET time = fully complete by the time we run.
+  |     Morning: 09:00–16:00 UTC (5am–noon EDT)
+  |     Evening: 19:00–01:00 UTC (3pm–9pm EDT, crosses midnight)
   |
-  ├── watcher.get_window_delays(start_utc, end_utc)
-  |     Fetches up to 100 posts per account from 5 Bluesky accounts.
-  |     Filters to posts within the time window.
-  |     Filters to rail delays only (keyword + line signal matching).
-  |     Cross-account dedup: same text from two accounts = one event.
-  |     No state file. Each run is self-contained.
+  ├── process_window("morning")  ← runs twice, independently
+  ├── process_window("evening")
   |
-  ├── interpreter.interpret_alert(text)  [× N events]
-  |     Claude Haiku extracts: line, delay_minutes, direction, cause,
-  |     train_number, is_cancellation.
+  |   Each window:
+  |     1. watcher.get_window_delays(start, end)
+  |          Fetches posts from 5 Bluesky accounts within the time window.
+  |          Filters: rail only, no bus, no light rail, ≥10 min delay.
+  |          Detects system-wide Penn alerts and line suspensions.
+  |          Cross-account dedup: same text from two accounts = one event.
+  |     2. interpret_window()
+  |          Claude Haiku extracts: line, train_number, delay_minutes,
+  |          cause, is_cancellation. System-wide events skip interpreter.
+  |     3. deduplicate_by_train()
+  |          Normal trains: keep highest delay per (train_number, date).
+  |          System-wide events: keep highest cost per (line, window).
+  |          *** Dedup is per-window. A Penn suspension in both morning
+  |          AND evening counts TWICE — once per window. ***
+  |     4. calculate_window()
+  |          Costs calculated AFTER dedup (not before).
+  |          Normal: riders × (delay_min/60) × $24.00
+  |          System-wide Penn: 8,000 riders/hr × (delay_min/60) × $24.00
+  |          Line suspension: riders/train × trains/hr × $24.00
+  |     5. log_delay() for each event → Google Sheet Event Log tab
   |
-  ├── calculator.calculate_cost(event)   [× N events]
-  |     Looks up peak riders by line.
-  |     Formula: riders × (delay_minutes / 60) × $24.00
-  |     Cancellations = 60-minute assumed delay.
-  |     All events treated as peak (we only run during rush hours).
+  ├── calculate_totals(morning_events + evening_events)
   |
-  ├── aggregator.deduplicate_by_train(events)
-  |     Groups by (train_number, date). Keeps HIGHEST delay per train.
-  |     e.g. train #3876 at 15 min then 25 min → counts once at 25 min.
+  ├── format_tweet(yesterday_et, totals)
+  |     Normal: "On Monday, NJ Transit delayed commuters for a total of..."
+  |     No delays: "Good news! Yesterday (Monday), NJ Transit ran on time..."
   |
-  ├── aggregator.calculate_totals(deduplicated)
-  |     total_person_minutes = sum of (delay_minutes × riders)
-  |     total_cost = sum of dollar estimates
+  ├── post_to_bluesky(tweet_text)
   |
-  ├── logger.log_delay(event)            [× N deduplicated events]
-  |     Appends row to Google Sheet Tab 1: Event Log.
-  |
-  └── post_to_bluesky(post_text)
-        Posts the summary to the bot account.
+  └── log_tweet() → Google Sheet Tweet_log tab
 ```
 
 ---
 
-## Post Format
+## Three Alert Types
 
+### 1. Normal per-train alert
 ```
-Good [morning/evening], fellow commuters! Today, NJ Transit delayed us
-for a total of [TOTAL PERSON-MINUTES] during the [morning/afternoon] rush.
-City employers lost [TOTAL COST] in productive working time.
-([N] delay events across [N] lines)
+NEC train #3876, the 9:28 PM arrival to PSNY, is up to 25 min. late
+due to earlier mechanical issues.
 ```
+→ Interpreter extracts train number, delay, cause
+→ `calculate_cost()`: riders × (delay/60) × $24
+→ Dedup by (train_number, date), keep highest delay
+
+### 2. System-wide Penn Station alert (≥15 min trigger)
+```
+NJ TRANSIT rail service is subject to up to 20-minute delays
+into and out of Penn Station New York.
+```
+→ Skips interpreter, handled directly
+→ `calculate_system_wide_cost()`: 8,000 riders/hr × (delay/60) × $24
+→ Dedup by (line="System-Wide (Penn Station)", window), keep highest cost
+→ Triggers on: "delays into and out", "subject to up to", "service suspended" + Penn, etc.
+→ Also catches: Penn-area service suspensions
+
+### 3. Line-wide suspension
+```
+Morris & Essex service is suspended in both directions
+due to Portal Bridge failure.
+```
+→ Skips interpreter, handled directly
+→ `calculate_line_suspension_cost()`: riders/train × trains/hr × $24
+→ Dedup by (line, window), keep highest cost
+→ Must name a specific rail line; must NOT mention Penn Station (that's type 2)
 
 ---
 
-## Tech Stack
+## Key Decisions — Locked In
 
-| Component | Tool | Notes |
-|---|---|---|
-| Language | Python 3.11 | All code in /src/ |
-| Scheduler | GitHub Actions | 2 cron jobs, ~60 min/month |
-| Data source | Bluesky public API | No auth needed for reading |
-| AI parsing | Claude API — Haiku | ~$1-3/month |
-| Spreadsheet | Google Sheets API (gspread) | |
-| Social posting | Bluesky AT Protocol (atproto) | |
-| Hosting | GitHub Actions | Free tier |
+### Value of Travel Time
+- **$24.00/hour** — USDOT formula (50% of median HHI) applied to NJ median HHI $99,781 (2023 ACS)
+- National default $18.80/hr disclosed as lower bound
+
+### Ridership (peak, all events use peak figures)
+```python
+RIDERS_PER_TRAIN = {
+    "Northeast Corridor": 825,  "North Jersey Coast": 500,
+    "Morris & Essex":     550,  "Montclair-Boonton":  415,
+    "Main/Bergen County": 450,  "Raritan Valley":     450,
+    "Pascack Valley":     315,  "Port Jervis":        300,
+    "Gladstone Branch":   300,  "Atlantic City":      260,
+    "Unknown":            400,
+}
+TRAINS_PER_HOUR_PEAK = {
+    "Northeast Corridor": 8,  "North Jersey Coast": 4,
+    "Morris & Essex":     5,  "Montclair-Boonton":  3,
+    "Main/Bergen County": 4,  "Raritan Valley":     4,
+    "Pascack Valley":     2,  "Port Jervis":        2,
+    "Gladstone Branch":   2,  "Atlantic City":      2,
+}
+PENN_STATION_RIDERS_PER_HOUR = 8000
+```
+
+### Thresholds
+- **Minimum delay: 10 minutes**
+- **Cancellations: 60-minute assumed delay**
+- **System-wide Penn alerts: 1-hour assumed duration**
+- **Line suspensions: 1-hour assumed duration**
+- **System-wide Penn minimum: 15 minutes** (below this, treated as normal alert)
+
+### Deduplication
+- Per-window (morning and evening deduplicated independently)
+- Normal trains: (train_number, date) → keep highest delay_minutes
+- System-wide: (line, window) → keep highest dollar_estimate
+- Cross-account text dedup in watcher (same post from two accounts = one)
+
+### Filters
+- Rail only — bus alerts filtered out (matches "bus service", "bus route", "nj transit bus", etc.)
+- Light rail filtered out (matches "light rail" anywhere)
+- "M and E", "M&E", "Morris and Essex" → Morris & Essex
+- "MOBO" → Montclair-Boonton (handled in both watcher and interpreter prompt)
+
+### Post format
+```
+On [Day], NJ Transit delayed commuters for a total of [PERSON-HOURS]
+across both rush hours. City employers lost [COST] in productive
+working time. ([N] delay events across [N] lines)
+```
+No delays:
+```
+Good news! Yesterday ([Day]), NJ Transit commuter rail ran on time
+with no significant delays reported. 🚂
+```
 
 ---
 
@@ -94,118 +164,28 @@ City employers lost [TOTAL COST] in productive working time.
 
 | Account | Coverage |
 |---|---|
-| `njmetroalert.bsky.social` | All lines — primary source |
-| `njtransit--nec.bsky.social` | NEC only — double coverage (note double dash) |
+| `njmetroalert.bsky.social` | All lines — primary |
+| `njtransit--nec.bsky.social` | NEC — double coverage (note double dash) |
 | `njtransit-me.bsky.social` | Morris & Essex |
 | `njtransit-mobo.bsky.social` | Montclair-Boonton |
 | `njtransit-mbpj.bsky.social` | Main/Bergen County |
-
-NJCL, RVL, PVL, ACL covered by njmetroalert only.
-
----
-
-## Key Decisions — Locked In
-
-### Value of Travel Time (VTTS)
-- **Rate: $24.00/hour**
-- USDOT formula (50% of median HHI) applied to NJ median HHI $99,781 (2023 Census ACS)
-- National USDOT default $18.80/hour disclosed as lower bound on website
-
-### Ridership
-- **All events use peak figures** — pipeline only runs during rush hours
-- No time-band logic (was removed as unnecessary complexity)
-
-### Minimum Delay Threshold
-- **10 minutes.** Delays under 10 min are ignored.
-
-### Cancellations
-- **60-minute assumed delay**, regardless of where on the line
-- Reflects realistic wait for next train during peak hours
-- Changed from 45 min after review — 60 min is more accurate
-
-### Deduplication Rule
-- Same train appearing multiple times → count **once at the highest observed delay**
-- Keyed on (train_number, date) in ET timezone
-- Trains without a number: each alert treated as unique
-
-### Direction
-- Not coded. Alert text too inconsistent for reliable parsing. Skipped by design.
-
-### Posting Cadence
-- **Two posts per day** (weekdays only): ~10:30am and ~9pm ET
-- No per-delay posts — aggregate summaries only
-
----
-
-## Ridership Table (peak, all events)
-
-```python
-RIDERS_PER_TRAIN = {
-    "Northeast Corridor": 825,
-    "North Jersey Coast":  500,
-    "Morris & Essex":      550,
-    "Montclair-Boonton":   415,
-    "Main/Bergen County":  450,
-    "Raritan Valley":      450,
-    "Pascack Valley":      315,
-    "Port Jervis":         300,
-    "Gladstone Branch":    300,
-    "Atlantic City":       260,
-    "Unknown":             400,   # fallback
-}
-```
 
 ---
 
 ## Google Sheet Structure
 
-**Single file, two tabs.**
+**Single file, three tabs.**
 
-### Tab 1: Event Log (Python writes here)
+### Tab 1: Event Log (Python writes)
 Columns: Date, Time, Line, Train #, Direction, Time Band, Delay Minutes, Estimated Riders, Dollar Estimate, Cause, Is Cancellation, Raw Alert Text, Posted to Bluesky
 
-Note: "Posted to Bluesky" column always shows "No" for individual rows — this is correct. Individual events are never posted; only the summary is. Column is a legacy artifact.
-
-**Last validated checkpoint: row 126 (March 27, 2026)**
-Hand-check in progress: comparing sheet rows against observed Bluesky alerts for the same window.
+Note: "Posted to Bluesky" always shows "No" — individual events are never posted, only the daily summary is. Legacy column.
 
 ### Tab 2: Totals (formula-driven, Python reads B2 only)
-- A2: `Annual Total`
 - B2: `=SUM('Event Log'!I:I)`
 
-Renaming the Google Sheet file is safe (code uses Sheet ID). Renaming the tabs would break things.
-
----
-
-## GitHub Actions Schedule
-
-```yaml
-# Morning summary: 15:00 UTC (11am EDT / 10am EST)
-- cron: "0 15 * * 1-5"
-
-# Evening summary: 02:00 UTC (10pm EDT / 9pm EST)
-- cron: "0 2 * * 2-6"
-```
-
-~60 minutes/month — well within GitHub's 2,000 free tier.
-
----
-
-## Environment Variables / GitHub Secrets
-
-| Secret | Description |
-|---|---|
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `BLUESKY_HANDLE` | Bot handle, e.g. `njtdelaycost.bsky.social` |
-| `BLUESKY_PASSWORD` | Bluesky app password (Settings → Privacy & Security → App Passwords) |
-| `GOOGLE_SHEET_ID` | ID from sheet URL (between /d/ and /edit) |
-| `GOOGLE_CREDENTIALS_JSON` | Full contents of Google service account .json file |
-
-### Runtime env vars (set by workflow)
-| Variable | Values | Description |
-|---|---|---|
-| `PERIOD` | `morning` / `evening` | Which rush window to summarize |
-| `DRY_RUN` | `true` / `false` | Skip posting and logging. Defaults to true for manual triggers. |
+### Tab 3: Tweet_log (auto-created by Python on first run)
+Columns: Timestamp, Tweet Text, Total Cost Estimate, Number of Delay Events, Post URI
 
 ---
 
@@ -216,102 +196,107 @@ Renaming the Google Sheet file is safe (code uses Sheet ID). Renaming the tabs w
 ├── CLAUDE.md
 ├── README.md
 ├── requirements.txt
+├── CNAME                        ← custom domain for GitHub Pages
 ├── .github/
 │   └── workflows/
-│       └── run_pipeline.yml
-└── src/
-    ├── main.py          ← single-pass orchestrator
-    ├── watcher.py       ← Bluesky fetcher (window-based, stateless)
-    ├── interpreter.py   ← Claude Haiku parser
-    ├── calculator.py    ← cost math + ridership table
-    ├── logger.py        ← Google Sheets writer
-    └── aggregator.py    ← DST-aware window calc, dedup, totals, post formatter
+│       └── daily.yml            ← one workflow, Mon–Fri, 19:00 UTC
+├── src/
+│   ├── daily.py                 ← main orchestrator (NEW)
+│   ├── watcher.py               ← Bluesky fetcher (window-based)
+│   ├── interpreter.py           ← Claude Haiku parser
+│   ├── calculator.py            ← cost math (3 calculation types)
+│   ├── logger.py                ← Sheets writer (Event Log + Tweet_log)
+│   └── aggregator.py            ← dedup, totals, DST window math
+└── website/
+    ├── index.html               ← static site (in progress)
+    └── data.json                ← TBD
 ```
 
-Note: `staging.py` and `data/` directory were removed in the architectural
-simplification. No state files are needed — each run fetches from Bluesky directly.
+Note: `main.py`, `staging.py`, `morning.yml`, `evening.yml`, `daily_summary.yml`,
+`run_pipeline.yml` are all retired and should be deleted from the repo.
+
+---
+
+## GitHub Actions Schedule
+
+```yaml
+# daily.yml
+- cron: "0 19 * * 1-5"   # 19:00 UTC Mon–Fri → ~5pm ET actual after ~2h delay
+```
+
+~10 minutes/month — well within GitHub's 2,000 free tier.
+
+---
+
+## Environment Variables / GitHub Secrets
+
+| Secret | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude API key (Haiku for interpretation) |
+| `BLUESKY_HANDLE` | Bot handle, e.g. `njtdelaycost.bsky.social` |
+| `BLUESKY_PASSWORD` | Bluesky app password |
+| `GOOGLE_SHEET_ID` | Sheet ID from URL (between /d/ and /edit) |
+| `GOOGLE_CREDENTIALS_JSON` | Full contents of Google service account .json |
+
+| Runtime var | Values | Notes |
+|---|---|---|
+| `DRY_RUN` | `true` / `false` | Skips Sheets writes and tweet. Default `true` for manual triggers. |
 
 ---
 
 ## Known Bugs Fixed
 
-### Evening window date rollover (fixed March 27, 2026)
-The evening job fires at 02:00 UTC, which is already the next calendar day
-in UTC. The original code used `now_utc.date()` to build the window, so it
-looked for posts on the wrong (future) day and found nothing.
+### Evening window date rollover
+Evening job fires at ~01:00 UTC (next calendar day). Original code used `now_utc.date()` to build window — wrong day. Fixed: use ET date, and for the daily pipeline, derive "yesterday" from ET time before calculating windows.
 
-Fix: use ET date instead of UTC date when building the window:
-```python
-today = (now_utc - timedelta(hours=offset)).date()  # correct
-# not: today = now_utc.date()                        # wrong
-```
+### System-wide dedup bypass (fixed)
+`main.py` was splitting system-wide events out before calling `deduplicate_by_train()`, so they were never deduplicated. Fixed: pass all events through dedup together.
 
-### Seed mode / first-run spam (resolved)
-On first deploy, the watcher found all historical posts as "new" and posted ~50
-old alerts. Since we no longer use a seen_alerts state file, this isn't possible
-in the new architecture — each run only looks at posts within the current rush
-window, so there's no concept of "old" vs "new" posts.
+### Period misclassification
+`github.event.schedule` returns unreliable values under GitHub backlog conditions. Fixed: split into separate workflow files with `PERIOD` hardcoded, eliminating detection logic entirely. Now further simplified to a single `daily.py` with no period detection needed.
+
+### Hyphenated minute regex
+"Up to 20-minute delays" wasn't being parsed. Fixed: `r"up to (\d+)[- ]min"` handles both hyphenated and space-separated formats.
 
 ---
 
-## Methodology Statement (website copy, approved)
+## Validation Checkpoint
 
-> This tracker estimates the economic cost of NJ Transit commuter rail delays
-> using the U.S. Department of Transportation's standard Value of Travel Time
-> methodology, adjusted to reflect New Jersey's median household income
-> ($99,781, 2023 U.S. Census). We apply a rate of $24.00 per hour. The national
-> USDOT default of $18.80/hour is disclosed as a lower-bound alternative.
->
-> Rider counts per train are estimates based on system-wide annual ridership
-> distributed proportionally across lines. They are not real-time measurements.
-> Only delays of 10 minutes or more are included. This tracker covers commuter
-> rail only.
->
-> These figures represent estimated opportunity costs, not cash losses. Data is
-> sourced from unofficial Bluesky bots mirroring NJ Transit's public MyTransit
-> alert system. This project is not affiliated with NJ Transit.
+**Dry run result (Monday, March 31 2026):**
+> "On Monday, NJ Transit delayed commuters for a total of 30,918 person-hours across both rush hours. City employers lost $742,040 in productive working time. (30 delay events across 5 lines)"
+
+Live run should match this exactly to confirm windows and dedup are correct.
+
+**Last sheet row validated:** ~row 126
 
 ---
 
-## Project Status (as of March 27, 2026)
+## Website (Phase 5 — In Progress)
 
-| Phase | Status | Notes |
-|---|---|---|
-| 1 — Brainstorming | ✅ Complete | |
-| 2 — Research | ✅ Complete | NJT API abandoned; Bluesky bots used |
-| 3 — Design | ✅ Complete | All key decisions locked |
-| 4 — Coding: Mechanism | ✅ Complete | Pipeline running live, bugs resolved |
-| 5 — Coding: Website | 🟡 Mostly complete | index.html done; data.json export TBD |
-| 6 — Polish | 🟡 In progress | |
-| 7 — Testing | 🟡 In progress | Hand-check of sheet data pending |
-| 8 — Launch | ⬜ Not started | |
+- Static site (`index.html`) — design complete, newsprint gray + Cornwallis Red
+- Hosting: GitHub Pages with custom domain (GoDaddy)
+- DNS: 4 A records → GitHub IPs, CNAME `www` → `yourusername.github.io`
+- `CNAME` file in repo root with domain name
+- `data.json` export from Google Sheet — TBD
 
-### What's working
-- Bluesky polling (window-based, stateless) ✅
-- DST-aware time window calculation ✅
-- Claude interpretation ✅
-- Cost calculation (peak-only, 60-min cancellations) ✅
-- Deduplication by train number ✅
-- Google Sheets logging ✅
-- Summary post formatting ✅
-- Bluesky posting ✅
-- Two-job GitHub Actions schedule ✅
+---
 
-### Immediate next steps
-1. Hand-check sheet rows from row 126 onward against observed Bluesky alerts
-2. Validate dedup is working correctly (compare raw alert count vs sheet row count)
-3. Connect website data.json export (Phase 5 remaining work)
-4. Update methodology white paper to reflect 60-min cancellation assumption
+## Methodology (approved summary)
+
+VTTS rate of $24.00/hr derived from USDOT formula applied to NJ median household income ($99,781, 2023 ACS). Rider counts are estimates from aggregate system data, not real-time measurements. Only delays ≥10 min on commuter rail lines are included. Figures represent opportunity costs, not cash losses. Not affiliated with NJ Transit.
+
+Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 ---
 
 ## Cost Estimate (monthly)
-- GitHub Actions: free (~60 min/month)
-- Claude API (Haiku): ~$1–3
+- GitHub Actions: free (~10 min/month)
+- Claude API (Haiku): ~$0.50–1.00
 - Google Sheets API: free
 - Bluesky API: free
-- **Total: ~$1–3/month**
+- GitHub Pages: free
+- **Total: under $1/month**
 
 ---
 
-*Last updated: March 27, 2026. Generated collaboratively with Claude (Anthropic).*
+*Last updated: April 1, 2026. Built collaboratively with Claude (Anthropic).*
