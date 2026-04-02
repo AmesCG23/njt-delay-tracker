@@ -164,7 +164,8 @@ def process_window(label, start_utc, end_utc):
         print(f"[DAILY] No qualifying posts in {label} window.")
         return [], 0
 
-    print(f"[DAILY] {len(raw)} raw posts fetched.")
+    raw_count = len(raw)
+    print(f"[DAILY] {raw_count} raw posts fetched.")
 
     # 2. Interpret
     interp = interpret_window(raw)
