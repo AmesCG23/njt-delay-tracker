@@ -158,11 +158,11 @@ def process_window(label, start_utc, end_utc):
     except Exception as e:
         print(f"[DAILY] Fetch failed: {e}")
         traceback.print_exc()
-        return []
+        return [], 0
 
     if not raw:
         print(f"[DAILY] No qualifying posts in {label} window.")
-        return []
+        return [], 0
 
     print(f"[DAILY] {len(raw)} raw posts fetched.")
 
@@ -188,7 +188,7 @@ def process_window(label, start_utc, end_utc):
     calculated = calculate_window(deduped)
     print(f"[DAILY] {len(calculated)} events with costs calculated.")
 
-    return calculated
+    return calculated, raw_count
 
 
 # ── Tweet formatting ──────────────────────────────────────────────────────────
