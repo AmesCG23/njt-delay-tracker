@@ -40,7 +40,7 @@ from calculator import (
     calculate_line_suspension_cost,
 )
 from aggregator import deduplicate_by_train, calculate_totals
-from logger import log_delay, log_tweet, clear_run_log, log_run, log_run_summary, clear_alert_log, log_alert_batch
+from logger import log_delay_batch, log_tweet, clear_run_log, log_run, log_run_summary, clear_alert_log, log_alert_batch
 
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
@@ -295,11 +295,10 @@ def run():
     morning_events, _morning_raw_count = process_window("morning", morn_start, morn_end)
 
     if not DRY_RUN:
-        for event in morning_events:
-            try:
-                log_delay(event)
-            except Exception as e:
-                print(f"[DAILY] Sheet log failed (morning event): {e}")
+        try:
+            log_delay_batch(morning_events)
+        except Exception as e:
+            print(f"[DAILY] Sheet log failed (morning batch): {e}")
         morning_totals = calculate_totals(morning_events)
         try:
             log_run("morning",
@@ -315,11 +314,10 @@ def run():
     evening_events, _evening_raw_count = process_window("evening", eve_start, eve_end)
 
     if not DRY_RUN:
-        for event in evening_events:
-            try:
-                log_delay(event)
-            except Exception as e:
-                print(f"[DAILY] Sheet log failed (evening event): {e}")
+        try:
+            log_delay_batch(evening_events)
+        except Exception as e:
+            print(f"[DAILY] Sheet log failed (evening batch): {e}")
         evening_totals = calculate_totals(evening_events)
         try:
             log_run("evening",

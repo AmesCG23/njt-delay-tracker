@@ -60,22 +60,62 @@ def ensure_headers(worksheet):
         worksheet.update("A1", [expected_headers])
 
 
+def _build_event_row(delay_data):
+    """Build a single Event Log row from a delay dict."""
+    ts = delay_data.get("timestamp", datetime.now().isoformat())
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M")
+    except (ValueError, TypeError, AttributeError):
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        time_str = datetime.now().strftime("%H:%M")
+
+    return [
+        date_str,
+        time_str,
+        delay_data.get("line", "Unknown"),
+        delay_data.get("train_number") or "",
+        delay_data.get("direction", "unknown"),
+        delay_data.get("time_band", "unknown"),
+        delay_data.get("delay_minutes") or "",
+        delay_data.get("estimated_riders") or "",
+        delay_data.get("dollar_estimate") or "",
+        delay_data.get("cause", ""),
+        "Yes" if delay_data.get("is_cancellation") else "No",
+        delay_data.get("raw_text", ""),
+        "No",
+    ]
+
+
 def log_delay(delay_data):
     """
-    Append a delay event to the Event Log tab.
-
-    Returns the running annual total (read from the Totals tab),
-    or None if we can't read it.
+    Append a single delay event to the Event Log tab.
+    Kept for backwards compatibility — prefer log_delay_batch() for
+    bulk writes to avoid hitting the Sheets API rate limit.
     """
+    log_delay_batch([delay_data])
+
+
+def log_delay_batch(delay_list):
+    """
+    Write a list of delay events to the Event Log in ONE API call.
+    This is the preferred method — avoids rate-limit errors when
+    NJT is having a bad day with many delays.
+
+    Called once per window (all morning events, then all evening events).
+    """
+    if not delay_list:
+        return
+
     sheet_id = os.environ.get("GOOGLE_SHEET_ID")
     if not sheet_id:
-        raise ValueError("GOOGLE_SHEET_ID environment variable not set.")
+        raise ValueError("GOOGLE_SHEET_ID not set.")
 
     try:
         client = get_sheet_client()
         spreadsheet = client.open_by_key(sheet_id)
 
-        # ── Write to Event Log tab ──
         try:
             log_tab = spreadsheet.worksheet(EVENT_LOG_TAB)
         except gspread.WorksheetNotFound:
@@ -83,54 +123,14 @@ def log_delay(delay_data):
 
         ensure_headers(log_tab)
 
-        # Parse timestamp
-        ts = delay_data.get("timestamp", datetime.now().isoformat())
-        try:
-            dt = datetime.fromisoformat(ts)
-            date_str = dt.strftime("%Y-%m-%d")
-            time_str = dt.strftime("%H:%M")
-        except (ValueError, TypeError):
-            date_str = datetime.now().strftime("%Y-%m-%d")
-            time_str = datetime.now().strftime("%H:%M")
+        rows = [_build_event_row(d) for d in delay_list]
+        log_tab.append_rows(rows, value_input_option="USER_ENTERED")
 
-        row = [
-            date_str,
-            time_str,
-            delay_data.get("line", "Unknown"),
-            delay_data.get("train_number") or "",
-            delay_data.get("direction", "unknown"),
-            delay_data.get("time_band", "unknown"),
-            delay_data.get("delay_minutes") or "",
-            delay_data.get("estimated_riders") or "",
-            delay_data.get("dollar_estimate") or "",
-            delay_data.get("cause", ""),
-            "Yes" if delay_data.get("is_cancellation") else "No",
-            delay_data.get("raw_text", ""),
-            "No",  # Posted to Bluesky — updated after posting
-        ]
-
-        log_tab.append_row(row, value_input_option="USER_ENTERED")
-        print(f"[LOGGER] Logged to Google Sheet: {delay_data.get('line')} | ${delay_data.get('dollar_estimate', 0):,.2f}")
-
-        # ── Read running total from Totals tab ──
-        try:
-            totals_tab = spreadsheet.worksheet(TOTALS_TAB)
-            # We expect the running total to be in cell B2
-            # (set up the formula =SUM('Event Log'!I:I) there manually)
-            running_total_str = totals_tab.acell("B2").value
-            if running_total_str:
-                # Remove $ and commas if present
-                running_total = float(running_total_str.replace("$", "").replace(",", ""))
-                print(f"[LOGGER] Running total: ${running_total:,.2f}")
-                return running_total
-        except (gspread.WorksheetNotFound, ValueError, AttributeError):
-            print("[LOGGER] Could not read running total from Totals tab.")
-
-        return None
+        print(f"[LOGGER] Wrote {len(rows)} event(s) to Event Log in one batch.")
 
     except Exception as e:
         print(f"[LOGGER] Google Sheets error: {e}")
-        return None
+        raise
 
 
 def mark_as_posted(row_number):
