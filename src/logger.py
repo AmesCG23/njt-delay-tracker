@@ -216,3 +216,233 @@ def log_tweet(text, total_cost, event_count, uri=None):
     except Exception as e:
         print(f"[LOGGER] Failed to log tweet: {e}")
         raise
+
+
+# ── Run Log ───────────────────────────────────────────────────────────────────
+RUN_LOG_TAB = "Run Log"
+
+RUN_LOG_HEADERS = [
+    "Run Date",
+    "Period",
+    "Raw Posts Fetched",
+    "After Dedup",
+    "Total Cost",
+    "Date of Post",
+    "Time of Post",
+    "Post URI",
+]
+
+
+def clear_run_log():
+    """
+    Wipe the Run Log tab at the start of each daily run.
+    Creates the tab (with headers) if it doesn't exist yet.
+    Called once at the top of daily.py before any window processing.
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        try:
+            run_tab = spreadsheet.worksheet(RUN_LOG_TAB)
+            # Wipe everything and re-add headers
+            run_tab.clear()
+            run_tab.update("A1", [RUN_LOG_HEADERS])
+            print(f"[LOGGER] Run Log cleared and ready.")
+        except gspread.WorksheetNotFound:
+            run_tab = spreadsheet.add_worksheet(RUN_LOG_TAB, rows=50, cols=len(RUN_LOG_HEADERS))
+            run_tab.update("A1", [RUN_LOG_HEADERS])
+            print(f"[LOGGER] Run Log tab created.")
+
+    except Exception as e:
+        print(f"[LOGGER] Could not clear Run Log: {e}")
+        raise
+
+
+def log_run(period, raw_count, dedup_count, total_cost, post_uri=None):
+    """
+    Append one row to the Run Log for a completed window.
+    Called once per window (morning, evening) in daily.py.
+
+    Args:
+        period:      "morning" or "evening"
+        raw_count:   number of raw posts fetched from Bluesky
+        dedup_count: number of events after deduplication
+        total_cost:  dollar total for this window
+        post_uri:    not the tweet URI (that's logged separately) —
+                     this is None per window; the tweet URI is added
+                     to the summary row by log_run_summary()
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    now = datetime.now()
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+        run_tab = spreadsheet.worksheet(RUN_LOG_TAB)
+
+        row = [
+            now.strftime("%Y-%m-%d"),       # Run Date
+            period.capitalize(),             # Period
+            raw_count,                       # Raw Posts Fetched
+            dedup_count,                     # After Dedup
+            f"${total_cost:,.2f}",           # Total Cost
+            "",                              # Date of Post (filled by log_run_summary)
+            "",                              # Time of Post (filled by log_run_summary)
+            "",                              # Post URI (filled by log_run_summary)
+        ]
+
+        run_tab.append_row(row, value_input_option="USER_ENTERED")
+        print(f"[LOGGER] Run Log: {period} — {raw_count} raw → {dedup_count} deduped → ${total_cost:,.2f}")
+
+    except Exception as e:
+        print(f"[LOGGER] Could not write to Run Log: {e}")
+        raise
+
+
+def log_run_summary(post_date, post_time, post_uri):
+    """
+    After the tweet fires, update the Run Log rows with the post details.
+    Fills in Date of Post, Time of Post, and Post URI on every row
+    (both morning and evening share the same post).
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+        run_tab = spreadsheet.worksheet(RUN_LOG_TAB)
+
+        all_rows = run_tab.get_all_values()
+        for i, row in enumerate(all_rows[1:], start=2):  # skip header
+            run_tab.update(f"F{i}", post_date)
+            run_tab.update(f"G{i}", post_time)
+            run_tab.update(f"H{i}", post_uri or "")
+
+        print(f"[LOGGER] Run Log updated with post details.")
+
+    except Exception as e:
+        print(f"[LOGGER] Could not update Run Log with post details: {e}")
+
+
+# ── Alert Log ─────────────────────────────────────────────────────────────────
+ALERT_LOG_TAB = "Alert Log"
+
+ALERT_LOG_HEADERS = [
+    "Date Seen",
+    "Alert Date",
+    "Alert Time",
+    "Line",
+    "Train #",
+    "Delay Minutes",
+    "Estimated Cost (pre-dedup)",
+    "Raw Alert Text",
+]
+
+
+def clear_alert_log():
+    """
+    Wipe the Alert Log tab at the start of each daily run.
+    Creates the tab with headers if it doesn't exist.
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        try:
+            alert_tab = spreadsheet.worksheet(ALERT_LOG_TAB)
+            alert_tab.clear()
+            alert_tab.update("A1", [ALERT_LOG_HEADERS])
+            print(f"[LOGGER] Alert Log cleared.")
+        except gspread.WorksheetNotFound:
+            alert_tab = spreadsheet.add_worksheet(
+                ALERT_LOG_TAB, rows=500, cols=len(ALERT_LOG_HEADERS)
+            )
+            alert_tab.update("A1", [ALERT_LOG_HEADERS])
+            print(f"[LOGGER] Alert Log tab created.")
+
+    except Exception as e:
+        print(f"[LOGGER] Could not clear Alert Log: {e}")
+        raise
+
+
+def log_alert_batch(interpreted_events):
+    """
+    Log a batch of interpreted alerts (pre-dedup) to the Alert Log tab.
+    Called once per window after interpretation, before deduplication.
+
+    For each event we calculate a quick cost estimate purely for the log —
+    this doesn't affect the final post-dedup cost calculation.
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    if not interpreted_events:
+        return
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+        alert_tab = spreadsheet.worksheet(ALERT_LOG_TAB)
+
+        # Import here to avoid circular imports
+        from calculator import VTTS_RATE, RIDERS_PER_TRAIN, PENN_STATION_RIDERS_PER_HOUR
+
+        rows = []
+        date_seen = datetime.now().strftime("%Y-%m-%d")
+
+        for event in interpreted_events:
+            # Parse alert timestamp for date/time columns
+            try:
+                from datetime import timezone
+                ts_str = event.get("timestamp", "")
+                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                alert_date = ts.strftime("%Y-%m-%d")
+                alert_time = ts.strftime("%H:%M")
+            except (ValueError, AttributeError):
+                alert_date = ""
+                alert_time = ""
+
+            # Quick cost estimate for the log
+            delay_mins = event.get("delay_minutes") or 0
+            line = event.get("line", "Unknown")
+
+            if event.get("system_wide") and not event.get("line_suspension"):
+                riders = PENN_STATION_RIDERS_PER_HOUR
+            else:
+                riders = RIDERS_PER_TRAIN.get(line, RIDERS_PER_TRAIN["Unknown"])
+
+            est_cost = round(riders * (delay_mins / 60) * VTTS_RATE, 2) if delay_mins else 0
+
+            rows.append([
+                date_seen,
+                alert_date,
+                alert_time,
+                line,
+                event.get("train_number") or "",
+                delay_mins or "",
+                f"${est_cost:,.2f}" if est_cost else "",
+                event.get("raw_text") or event.get("text", ""),
+            ])
+
+        if rows:
+            alert_tab.append_rows(rows, value_input_option="USER_ENTERED")
+            print(f"[LOGGER] Alert Log: {len(rows)} alerts recorded.")
+
+    except Exception as e:
+        print(f"[LOGGER] Could not write to Alert Log: {e}")
+        raise

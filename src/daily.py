@@ -40,7 +40,7 @@ from calculator import (
     calculate_line_suspension_cost,
 )
 from aggregator import deduplicate_by_train, calculate_totals
-from logger import log_delay, log_tweet
+from logger import log_delay, log_tweet, clear_run_log, log_run, log_run_summary, clear_alert_log, log_alert_batch
 
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
@@ -170,6 +170,16 @@ def process_window(label, start_utc, end_utc):
     interp = interpret_window(raw)
     print(f"[DAILY] {len(interp)} posts after interpretation.")
 
+    # 2b. Log all interpreted alerts before dedup (for hand-checking)
+    # Imported here to avoid circular imports at module level
+    import os as _os
+    if _os.environ.get("DRY_RUN", "false").lower() != "true":
+        try:
+            from logger import log_alert_batch
+            log_alert_batch(interp)
+        except Exception as _e:
+            print(f"[DAILY] Alert Log write failed: {_e}")
+
     # 3. Deduplicate
     deduped = deduplicate_by_train(interp)
     print(f"[DAILY] {len(deduped)} events after deduplication.")
@@ -270,8 +280,19 @@ def run():
     # Determine windows
     yesterday_et, morn_start, morn_end, eve_start, eve_end = get_yesterday_windows()
 
+    # ── Clear logs (fresh slate for this run) ────────────────────────────────
+    if not DRY_RUN:
+        try:
+            clear_run_log()
+        except Exception as e:
+            print(f"[DAILY] Could not clear Run Log: {e}")
+        try:
+            clear_alert_log()
+        except Exception as e:
+            print(f"[DAILY] Could not clear Alert Log: {e}")
+
     # ── Morning window ────────────────────────────────────────────────────────
-    morning_events = process_window("morning", morn_start, morn_end)
+    morning_events, _morning_raw_count = process_window("morning", morn_start, morn_end)
 
     if not DRY_RUN:
         for event in morning_events:
@@ -279,11 +300,19 @@ def run():
                 log_delay(event)
             except Exception as e:
                 print(f"[DAILY] Sheet log failed (morning event): {e}")
+        morning_totals = calculate_totals(morning_events)
+        try:
+            log_run("morning",
+                    raw_count=_morning_raw_count,
+                    dedup_count=len(morning_events),
+                    total_cost=morning_totals["total_cost"])
+        except Exception as e:
+            print(f"[DAILY] Run Log write failed (morning): {e}")
     else:
         print(f"[DAILY] DRY RUN: would log {len(morning_events)} morning events to Sheets.")
 
     # ── Evening window ────────────────────────────────────────────────────────
-    evening_events = process_window("evening", eve_start, eve_end)
+    evening_events, _evening_raw_count = process_window("evening", eve_start, eve_end)
 
     if not DRY_RUN:
         for event in evening_events:
@@ -291,6 +320,14 @@ def run():
                 log_delay(event)
             except Exception as e:
                 print(f"[DAILY] Sheet log failed (evening event): {e}")
+        evening_totals = calculate_totals(evening_events)
+        try:
+            log_run("evening",
+                    raw_count=_evening_raw_count,
+                    dedup_count=len(evening_events),
+                    total_cost=evening_totals["total_cost"])
+        except Exception as e:
+            print(f"[DAILY] Run Log write failed (evening): {e}")
     else:
         print(f"[DAILY] DRY RUN: would log {len(evening_events)} evening events to Sheets.")
 
@@ -313,8 +350,11 @@ def run():
 
     if not DRY_RUN:
         uri = post_to_bluesky(tweet_text)
+        now = datetime.now()
+        post_date = now.strftime("%Y-%m-%d")
+        post_time = now.strftime("%H:%M:%S")
 
-        # Log the tweet to the Tweet_log tab
+        # Log tweet to Tweet_log tab
         try:
             log_tweet(
                 text=tweet_text,
@@ -324,6 +364,12 @@ def run():
             )
         except Exception as e:
             print(f"[DAILY] Tweet_log write failed: {e}")
+
+        # Update Run Log rows with post details
+        try:
+            log_run_summary(post_date, post_time, uri)
+        except Exception as e:
+            print(f"[DAILY] Run Log summary update failed: {e}")
     else:
         print("[DAILY] DRY RUN: not posting.")
 
