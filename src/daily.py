@@ -189,6 +189,15 @@ def process_window(label, start_utc, end_utc):
     calculated = calculate_window(deduped)
     print(f"[DAILY] {len(calculated)} events with costs calculated.")
 
+    # Log each deduplicated event for the GitHub Actions log
+    for ev in calculated:
+        train = ev.get("train_number") or "—"
+        line  = ev.get("line", "Unknown")
+        mins  = ev.get("delay_minutes") or "?"
+        riders = ev.get("estimated_riders") or "?"
+        cost  = ev.get("dollar_estimate") or 0
+        print(f"[DAILY]   {line} | train #{train} | {mins} min | ~{riders} riders | ${cost:,.2f}")
+
     return calculated, raw_count
 
 
