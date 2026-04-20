@@ -10,16 +10,17 @@ An automated pipeline that monitors NJ Transit commuter rail delays by reading p
 
 One post goes out daily at ~3pm ET (targeting 5pm ET actual after GitHub delay), summarizing the **previous day's** complete morning and evening rush delays.
 
-**Owner:** Ames (non-technical background — plain English explanations always, code second)
+**Owner:** Ames, Brennan Center for Justice (non-technical — plain English explanations always, code second)
+**Creator persona (anonymous):** TBD — candidates include The Dispatcher, The Flagman, A Daily Rider
 
 ---
 
 ## Architecture: Single Daily Pipeline
 
-One workflow fires once per weekday. No staging files, no caching, no collect/summarize split. Bluesky stores all posts permanently so we always reach back and fetch what we need.
+One workflow (`daily.yml`) fires once per weekday (Tue–Sat, covering Mon–Fri delays). No staging files, no caching, no collect/summarize split. Bluesky stores all posts permanently so we always reach back and fetch what we need.
 
 ```
-GitHub Actions fires at 19:00 UTC Mon–Fri (~5pm ET actual after ~2h delay)
+GitHub Actions fires at 19:00 UTC Tue–Sat (~5pm ET actual after ~2h delay)
        |
        v
 daily.py
@@ -52,7 +53,9 @@ daily.py
   |          Normal: riders × (delay_min/60) × $24.00
   |          System-wide Penn: 8,000 riders/hr × (delay_min/60) × $24.00
   |          Line suspension: riders/train × trains/hr × $24.00
-  |     5. log_delay() for each event → Google Sheet Event Log tab
+  |     5. log_delay_batch() → Google Sheet Event Log tab (batched, one API call)
+  |     6. log_alert_batch() → Google Sheet Alert Log tab (pre-dedup, for hand-check)
+  |     7. log_run() → Google Sheet Run Log tab
   |
   ├── calculate_totals(morning_events + evening_events)
   |
@@ -62,7 +65,8 @@ daily.py
   |
   ├── post_to_bluesky(tweet_text)
   |
-  └── log_tweet() → Google Sheet Tweet_log tab
+  ├── log_tweet() → Google Sheet Tweet_log tab
+  └── log_run_summary() → updates Run Log with post details
 ```
 
 ---
@@ -85,9 +89,9 @@ into and out of Penn Station New York.
 ```
 → Skips interpreter, handled directly
 → `calculate_system_wide_cost()`: 8,000 riders/hr × (delay/60) × $24
+→ Assumed duration: 1 hour
 → Dedup by (line="System-Wide (Penn Station)", window), keep highest cost
-→ Triggers on: "delays into and out", "subject to up to", "service suspended" + Penn, etc.
-→ Also catches: Penn-area service suspensions
+→ Triggers on: "delays into and out", "subject to up to", "service.{0,30}suspend" + Penn, etc.
 
 ### 3. Line-wide suspension
 ```
@@ -96,6 +100,7 @@ due to Portal Bridge failure.
 ```
 → Skips interpreter, handled directly
 → `calculate_line_suspension_cost()`: riders/train × trains/hr × $24
+→ Assumed duration: 1 hour
 → Dedup by (line, window), keep highest cost
 → Must name a specific rail line; must NOT mention Penn Station (that's type 2)
 
@@ -132,7 +137,7 @@ PENN_STATION_RIDERS_PER_HOUR = 8000
 - **Cancellations: 60-minute assumed delay**
 - **System-wide Penn alerts: 1-hour assumed duration**
 - **Line suspensions: 1-hour assumed duration**
-- **System-wide Penn minimum: 15 minutes** (below this, treated as normal alert)
+- **System-wide Penn minimum: 15 minutes** (below this, not treated as system-wide)
 
 ### Deduplication
 - Per-window (morning and evening deduplicated independently)
@@ -141,10 +146,29 @@ PENN_STATION_RIDERS_PER_HOUR = 8000
 - Cross-account text dedup in watcher (same post from two accounts = one)
 
 ### Filters
-- Rail only — bus alerts filtered out (matches "bus service", "bus route", "nj transit bus", etc.)
-- Light rail filtered out (matches "light rail" anywhere)
-- "M and E", "M&E", "Morris and Essex" → Morris & Essex
-- "MOBO" → Montclair-Boonton (handled in both watcher and interpreter prompt)
+- Rail only — bus alerts filtered on specific phrases: "bus service", "bus route",
+  "nj transit bus", "njt bus", "bus detour", starts with "bus "
+- Light rail filtered on "light rail" anywhere in text
+- Minimum 10-minute delay threshold
+
+### Line name matching (wildcards)
+```
+Northeast Corridor: "northeast corridor", "nec "
+North Jersey Coast: "north jersey coast", "njcl", "nj coast", "coast line", "jersey coast line"
+Morris & Essex:     "morris & essex", "morris and essex", "m and e", "m&e"
+Montclair-Boonton:  "montclair-boonton", "montclair boonton", "mobo"
+Main/Bergen County: "main/bergen", "main bergen", "mbpj", "main line",
+                    "bergen county line", "bergen line", "main-bergen"
+Raritan Valley:     "raritan valley", "rvl"
+Pascack Valley:     "pascack valley", "pvl"
+Port Jervis:        "port jervis"
+Atlantic City:      "atlantic city rail"
+Gladstone:          "gladstone"
+```
+Note: "main line" is a generic phrase — watch for false positives in Alert Log.
+
+Interpreter prompt also includes abbreviation rules so Claude Haiku maps
+MOBO → Montclair-Boonton, M&E → Morris & Essex, MBPJ → Main/Bergen County, etc.
 
 ### Post format
 ```
@@ -174,18 +198,37 @@ with no significant delays reported. 🚂
 
 ## Google Sheet Structure
 
-**Single file, three tabs.**
+**Single file, five tabs.**
 
-### Tab 1: Event Log (Python writes)
+### Tab 1: Event Log (Python writes — batched)
+One row per deduplicated delay event. Written once per window via `log_delay_batch()`.
 Columns: Date, Time, Line, Train #, Direction, Time Band, Delay Minutes, Estimated Riders, Dollar Estimate, Cause, Is Cancellation, Raw Alert Text, Posted to Bluesky
 
-Note: "Posted to Bluesky" always shows "No" — individual events are never posted, only the daily summary is. Legacy column.
+Note: "Posted to Bluesky" always "No" — individual events never posted. Legacy column.
 
-### Tab 2: Totals (formula-driven, Python reads B2 only)
-- B2: `=SUM('Event Log'!I:I)`
+### Tab 2: Totals (formula-driven)
+- B2: `=SUM('Event Log'!I:I)` — running cumulative total
 
-### Tab 3: Tweet_log (auto-created by Python on first run)
+### Tab 3: Tweet_log (auto-created)
+One row per daily tweet sent.
 Columns: Timestamp, Tweet Text, Total Cost Estimate, Number of Delay Events, Post URI
+
+### Tab 4: Alert Log (wiped and rewritten each run)
+Pre-dedup audit trail for hand-checking. One row per interpreted alert before
+deduplication. Use this to verify the script saw what Bluesky shows.
+Columns: Date Seen, Alert Date, Alert Time, Line, Train #, Delay Minutes,
+Estimated Cost (pre-dedup), Raw Alert Text
+
+### Tab 5: Run Log (wiped and rewritten each run)
+One row per window (morning + evening). Quick sanity check on overall numbers.
+Columns: Run Date, Period, Raw Posts Fetched, After Dedup, Total Cost,
+Date of Post, Time of Post, Post URI
+
+### Tab 6: for_web (manual — publish to web)
+Feeds the public website via Google Visualization API CSV endpoint.
+- A1: yesterday's total cost (number, e.g. 742040)
+- A2: cumulative total since launch (number)
+Must be published: File → Share → Publish to web
 
 ---
 
@@ -199,32 +242,41 @@ Columns: Timestamp, Tweet Text, Total Cost Estimate, Number of Delay Events, Pos
 ├── CNAME                        ← custom domain for GitHub Pages
 ├── .github/
 │   └── workflows/
-│       └── daily.yml            ← one workflow, Mon–Fri, 19:00 UTC
+│       └── daily.yml            ← one workflow, Tue–Sat, 19:00 UTC
 ├── src/
-│   ├── daily.py                 ← main orchestrator (NEW)
-│   ├── watcher.py               ← Bluesky fetcher (window-based)
+│   ├── daily.py                 ← main orchestrator
+│   ├── watcher.py               ← Bluesky fetcher + alert type detection
 │   ├── interpreter.py           ← Claude Haiku parser
 │   ├── calculator.py            ← cost math (3 calculation types)
-│   ├── logger.py                ← Sheets writer (Event Log + Tweet_log)
-│   └── aggregator.py            ← dedup, totals, DST window math
+│   ├── logger.py                ← Sheets writer (all tabs)
+│   └── aggregator.py            ← dedup, totals, post formatter
 └── website/
-    ├── index.html               ← static site (in progress)
-    └── data.json                ← TBD
+    └── index.html               ← static site (design complete)
 ```
 
-Note: `main.py`, `staging.py`, `morning.yml`, `evening.yml`, `daily_summary.yml`,
-`run_pipeline.yml` are all retired and should be deleted from the repo.
+Retired files (delete from repo if present):
+`main.py`, `staging.py`, `morning.yml`, `evening.yml`,
+`daily_summary.yml`, `run_pipeline.yml`
 
 ---
 
 ## GitHub Actions Schedule
 
 ```yaml
-# daily.yml
-- cron: "0 19 * * 1-5"   # 19:00 UTC Mon–Fri → ~5pm ET actual after ~2h delay
+# daily.yml — Tue–Sat so Tuesday covers Monday, Saturday covers Friday
+- cron: "0 19 * * 2-6"   # 19:00 UTC → ~5pm ET actual after ~2h delay
 ```
 
 ~10 minutes/month — well within GitHub's 2,000 free tier.
+
+---
+
+## Google Sheets API Rate Limiting
+
+All Sheets writes are batched to avoid 429 quota errors on bad NJT days:
+- `log_delay_batch()` — one `append_rows()` call per window (not per event)
+- `log_alert_batch()` — one `append_rows()` call per window
+- Total API calls per run: ~10 regardless of delay count
 
 ---
 
@@ -240,52 +292,114 @@ Note: `main.py`, `staging.py`, `morning.yml`, `evening.yml`, `daily_summary.yml`
 
 | Runtime var | Values | Notes |
 |---|---|---|
-| `DRY_RUN` | `true` / `false` | Skips Sheets writes and tweet. Default `true` for manual triggers. |
+| `DRY_RUN` | `true` / `false` | Skips all Sheets writes and tweet. Default `true` for manual triggers. |
 
 ---
 
 ## Known Bugs Fixed
 
 ### Evening window date rollover
-Evening job fires at ~01:00 UTC (next calendar day). Original code used `now_utc.date()` to build window — wrong day. Fixed: use ET date, and for the daily pipeline, derive "yesterday" from ET time before calculating windows.
+Evening window crosses UTC midnight. Original code used `now_utc.date()` — fetched
+wrong day. Fixed: derive "yesterday" from ET time, compute window from that.
 
-### System-wide dedup bypass (fixed)
-`main.py` was splitting system-wide events out before calling `deduplicate_by_train()`, so they were never deduplicated. Fixed: pass all events through dedup together.
+### System-wide dedup bypass
+`daily.py` was splitting system-wide events out before `deduplicate_by_train()`,
+bypassing dedup entirely. Fixed: all events flow through dedup together.
 
 ### Period misclassification
-`github.event.schedule` returns unreliable values under GitHub backlog conditions. Fixed: split into separate workflow files with `PERIOD` hardcoded, eliminating detection logic entirely. Now further simplified to a single `daily.py` with no period detection needed.
+`github.event.schedule` returns unreliable values under backlog. Fixed: retired
+multi-workflow approach, `PERIOD` no longer needed — `daily.py` always processes
+both windows.
 
 ### Hyphenated minute regex
-"Up to 20-minute delays" wasn't being parsed. Fixed: `r"up to (\d+)[- ]min"` handles both hyphenated and space-separated formats.
+"Up to 20-minute delays" wasn't parsed. Fixed: `r"up to (\d+)[- ]min"` handles
+both "20-minute" and "20 min" formats.
+
+### process_window return type
+`process_window()` returned a plain list but caller expected `(events, raw_count)`
+tuple. Fixed: all return paths return a 2-tuple including early-exit cases.
+
+### raw_count NameError
+`raw_count` variable was referenced in the return statement but never assigned
+in the happy path. Fixed: `raw_count = len(raw)` added after fetch.
+
+---
+
+## Hand-Check Protocol
+
+To validate a daily total against Bluesky manually:
+1. Open the Alert Log tab — shows every alert the script saw pre-dedup
+2. Open the five Bluesky accounts, scroll to the time window
+3. Count qualifying rail alerts on Bluesky; compare to Raw Posts in Run Log
+4. For each Bluesky alert, verify it appears in Alert Log with correct line/delay
+5. For any train # appearing twice in Alert Log, verify Event Log has it once at highest delay
+6. Spot-check one cost: riders × (delay_min/60) × $24 should match Dollar Estimate
+
+Common sources of legitimate slippage:
+- Alert uses unrecognized line name → filtered, not in Alert Log (add wildcard)
+- Same alert from two accounts → cross-account deduped in watcher, one copy in Alert Log
+- Alert posted after window closes → never fetched, expected
+- Escalating alert (15→25 min) → two rows in Alert Log, one in Event Log at 25 min
+
+---
+
+## Website
+
+- Static site (`index.html`) — complete, newsprint gray (#f0eeeb) + EB Garamond
+- Data pulled from `for_web` tab via Google Visualization API CSV endpoint
+- Hosting: GitHub Pages with custom domain (GoDaddy)
+- DNS: 4 A records → GitHub IPs, CNAME `www` → `yourusername.github.io`
+- `CNAME` file in repo root with domain name
+- SPREADSHEET_ID and email still need to be filled in index.html
+- `for_web` tab needs to be created manually and published to web
+
+**GitHub Pages DNS records:**
+```
+185.199.108.153
+185.199.109.153
+185.199.110.153
+185.199.111.153
+```
+
+---
+
+## Project Identity (In Progress)
+
+**Regional framing:** The project's core argument is that NJ Transit delays are
+a NY/NJ regional economic problem — NY employers have a direct stake. Name should
+invoke the shared commuter experience across the Hudson.
+
+**Name candidates under consideration:**
+- The 7:14 (or similar specific train time) — insider shorthand feel
+- Residual Delays — NJT's own euphemism turned against them
+- Making All Stops — the announcement everyone recognizes
+- Departure Vision — NJT's own product name, cheeky
+- Portal — named after Portal Bridge, the actual bottleneck
+
+**Creator persona (anonymous):** TBD
+- The Dispatcher — institutional knowledge, knows where all the trains are
+- The Flagman — raising a flag on a problem; railroad vernacular
+- A Daily Rider — humble, relatable, impossible to attack
+
+---
+
+## Methodology (approved summary)
+
+VTTS rate of $24.00/hr derived from USDOT formula applied to NJ median household
+income ($99,781, 2023 ACS). Rider counts are estimates from aggregate system data,
+not real-time measurements. Only delays ≥10 min on commuter rail lines are included.
+Figures represent opportunity costs, not cash losses. Not affiliated with NJ Transit.
+
+Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 ---
 
 ## Validation Checkpoint
 
 **Dry run result (Monday, March 31 2026):**
-> "On Monday, NJ Transit delayed commuters for a total of 30,918 person-hours across both rush hours. City employers lost $742,040 in productive working time. (30 delay events across 5 lines)"
-
-Live run should match this exactly to confirm windows and dedup are correct.
-
-**Last sheet row validated:** ~row 126
-
----
-
-## Website (Phase 5 — In Progress)
-
-- Static site (`index.html`) — design complete, newsprint gray + Cornwallis Red
-- Hosting: GitHub Pages with custom domain (GoDaddy)
-- DNS: 4 A records → GitHub IPs, CNAME `www` → `yourusername.github.io`
-- `CNAME` file in repo root with domain name
-- `data.json` export from Google Sheet — TBD
-
----
-
-## Methodology (approved summary)
-
-VTTS rate of $24.00/hr derived from USDOT formula applied to NJ median household income ($99,781, 2023 ACS). Rider counts are estimates from aggregate system data, not real-time measurements. Only delays ≥10 min on commuter rail lines are included. Figures represent opportunity costs, not cash losses. Not affiliated with NJ Transit.
-
-Full white paper: `NJT_Delay_Tracker_Methodology.docx`
+> "On Monday, NJ Transit delayed commuters for a total of 30,918 person-hours
+> across both rush hours. City employers lost $742,040 in productive working time.
+> (30 delay events across 5 lines)"
 
 ---
 
@@ -299,4 +413,4 @@ Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 ---
 
-*Last updated: April 1, 2026. Built collaboratively with Claude (Anthropic).*
+*Last updated: April 19, 2026. Built collaboratively with Claude (Anthropic).*
