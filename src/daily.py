@@ -45,6 +45,10 @@ from logger import log_delay_batch, log_tweet, clear_run_log, log_run, log_run_s
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
 
+# OVERRIDE_DATE: if set (YYYY-MM-DD), use this as "yesterday" instead of computing
+# from the current time. Used by the benchmark workflow to replay known dates.
+OVERRIDE_DATE = os.environ.get("OVERRIDE_DATE", "").strip()
+
 
 # ── Window helpers ────────────────────────────────────────────────────────────
 
@@ -55,12 +59,24 @@ def get_yesterday_windows():
     At 19:00 UTC (3pm EDT), the ET date equals the UTC date.
     Yesterday ET = UTC date - 1. The evening window ends at 01:00 UTC
     on the day after yesterday, which is in the past by the time we run.
+
+    If OVERRIDE_DATE is set (YYYY-MM-DD), that date is used as "yesterday"
+    directly — used by the benchmark workflow to replay a known date.
     """
     now_utc = datetime.now(timezone.utc)
 
-    # ET date at run time (EDT = UTC-4)
-    et_date_now = (now_utc - timedelta(hours=4)).date()
-    yesterday_et = et_date_now - timedelta(days=1)
+    if OVERRIDE_DATE:
+        try:
+            yesterday_et = date.fromisoformat(OVERRIDE_DATE)
+            print(f"[DAILY] OVERRIDE_DATE set — using {yesterday_et} as yesterday")
+        except ValueError:
+            print(f"[DAILY] Invalid OVERRIDE_DATE '{OVERRIDE_DATE}' — falling back to yesterday")
+            et_date_now = (now_utc - timedelta(hours=4)).date()
+            yesterday_et = et_date_now - timedelta(days=1)
+    else:
+        # ET date at run time (EDT = UTC-4)
+        et_date_now = (now_utc - timedelta(hours=4)).date()
+        yesterday_et = et_date_now - timedelta(days=1)
 
     y = yesterday_et
     y_next = yesterday_et + timedelta(days=1)
@@ -109,7 +125,50 @@ def interpret_window(raw_delays):
             continue
 
         if result is None:
-            continue
+            # Interpreter returned null — but if the watcher already identified
+            # the line and delay, don't silently drop it. Build a minimal event
+            # from the watcher's data so RVL/Hoboken alerts aren't lost.
+            #
+            # Backstop: first check the raw text for resolution/restoration
+            # language. If Haiku returned null because the alert is saying
+            # "service has resumed" or "trains are back on schedule," we should
+            # trust that null and drop the event — not resurrect it from
+            # watcher data that may have extracted a stale delay figure.
+            RESOLUTION_PHRASES = [
+                "on or close to schedule",
+                "normal service",
+                "service has resumed",
+                "service restored",
+                "service has been restored",
+                "trains are running",
+                "back on schedule",
+                "cleared",
+                "no longer",
+                "resuming",
+            ]
+            raw_text = raw.get("text", "").lower()
+            is_resolution = any(p in raw_text for p in RESOLUTION_PHRASES)
+            if is_resolution:
+                print(f"[DAILY] Interpreter null + resolution language detected — correctly dropping.")
+                continue
+
+            watcher_line = raw.get("line", "Unknown")
+            watcher_delay = raw.get("delay_minutes")
+            if watcher_line != "Unknown" and watcher_delay and watcher_delay >= 10:
+                print(f"[DAILY] Interpreter returned null — using watcher fallback: "
+                      f"{watcher_line} | {watcher_delay} min")
+                result = {
+                    "line":            watcher_line,
+                    "delay_minutes":   watcher_delay,
+                    "direction":       "unknown",
+                    "cause":           "unknown",
+                    "train_number":    None,
+                    "is_cancellation": False,
+                    "time_band":       "peak",
+                    "raw_text":        raw.get("text", ""),
+                }
+            else:
+                continue
 
         result["timestamp"] = raw.get("timestamp", datetime.now(timezone.utc).isoformat())
         result["system_wide"] = False

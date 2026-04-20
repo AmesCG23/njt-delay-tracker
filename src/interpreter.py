@@ -60,9 +60,17 @@ Extract the following and respond with ONLY valid JSON, no explanation:
 
 Rules:
 - "up to X min late" → delay_minutes = X
-- Inbound = arriving at Penn Station or Hoboken Terminal
-- Outbound = departing Penn Station or Hoboken Terminal, going to NJ
-- If the alert says "on or close to schedule" or "normal service", return null for the whole thing
+- Inbound = arriving at New York Penn Station, Newark Penn Station, or Hoboken Terminal
+- Outbound = departing New York Penn Station, Newark Penn Station, or Hoboken Terminal
+- PSNY = Penn Station New York. PSNY and "Penn Station" are the same place.
+- The Raritan Valley Line (RVL) terminates at Newark Penn Station — NOT New York Penn Station.
+  Trains travel between Newark and High Bridge or Raritan. "Arrival into Raritan" or
+  "arrival into High Bridge" are valid outbound RVL delays. Count them.
+- Hoboken Terminal is a valid terminal for M&E, MOBO, Main/Bergen, Pascack, Port Jervis lines.
+  "Departure from Hoboken" = outbound. "Arrival into Hoboken" = inbound.
+- Only return null for the ENTIRE response if the alert explicitly says "on or close to
+  schedule" or "normal service" — NOT just because the destination is unfamiliar.
+  When in doubt, extract what you can and return it.
 - Cause should be 3-6 words maximum
 - Line name abbreviations: NEC = Northeast Corridor, NJCL = North Jersey Coast Line,
   M&E or M and E or Morris and Essex = Morris & Essex, MOBO = Montclair-Boonton,
