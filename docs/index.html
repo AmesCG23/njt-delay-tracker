@@ -3,9 +3,315 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NJ Transit Delay Tracker</title>
+  <title>NJ Transit Delay Cost Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --newsprint: #f0eeeb;
+      --ink: #1a1a1a;
+      --ink-light: #4a4a4a;
+      --ink-faint: #8a8a8a;
+      --rule: #c0bdb8;
+    }
+
+    body {
+      font-family: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+      background-color: var(--newsprint);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* === HEADER === */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 1.5rem 2rem;
+    }
+
+    .logo img {
+      height: 40px;
+      width: auto;
+      display: block;
+    }
+
+    /* Placeholder logo — replace src with your actual logo */
+    .logo-placeholder {
+      height: 40px;
+      width: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      border: 1px solid var(--rule);
+    }
+
+    .social-icons {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .social-icons a {
+      color: var(--ink-light);
+      text-decoration: none;
+      transition: color 0.2s ease;
+      display: flex;
+      align-items: center;
+    }
+
+    .social-icons a:hover {
+      color: var(--ink);
+    }
+
+    .social-icons svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* === MAIN CONTENT === */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 2rem 3rem;
+      text-align: center;
+    }
+
+    .hero-block {
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .figure-label {
+      font-size: 1.05rem;
+      font-weight: 400;
+      color: var(--ink-light);
+      margin-bottom: 0.3rem;
+      letter-spacing: 0.02em;
+    }
+
+    .figure-primary {
+      font-size: 3.5rem;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.25rem;
+    }
+
+    .figure-caption {
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: var(--ink-light);
+      font-style: italic;
+      margin-bottom: 2.5rem;
+    }
+
+    .figure-secondary {
+      font-size: 5rem;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+
+    .figure-caption-secondary {
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: var(--ink-light);
+      font-style: italic;
+      margin-bottom: 2.5rem;
+    }
+
+    .body-text {
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: var(--ink);
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* === FOOTER === */
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 1.25rem 2rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* === LOADING STATE === */
+    .figure-loading {
+      opacity: 0.3;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.15; }
+    }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 600px) {
+      header {
+        padding: 1rem 1.25rem;
+      }
+
+      main {
+        padding: 1.5rem 1.25rem 2rem;
+      }
+
+      .figure-primary {
+        font-size: 2.5rem;
+      }
+
+      .figure-secondary {
+        font-size: 3.5rem;
+      }
+
+      footer {
+        padding: 1rem 1.25rem;
+      }
+    }
+  </style>
 </head>
 <body>
-  <p>Coming soon.</p>
+
+  <header>
+    <!-- Replace with <img src="logo.jpg" alt="NJ Transit Delay Cost Tracker" class="logo"> -->
+    <div class="logo">
+      <div class="logo-placeholder">LOGO</div>
+    </div>
+
+    <nav class="social-icons">
+      <!-- Bluesky -->
+      <a href="https://bsky.app/profile/njtdelaycost.bsky.social" aria-label="Bluesky" title="Follow on Bluesky">
+        <svg viewBox="0 0 600 530" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M135.72 44.03C202.22 93.87 273.72 195.17 300 249.57c26.28-54.4 97.78-155.7 164.28-205.54C528.08-5.57 600-28.93 600 62.33c0 18.14-10.4 152.43-16.5 174.13-21.2 75.37-98.47 94.6-166.87 82.93 119.47 20.4 149.87 87.93 84.2 155.47-124.87 128.53-179.6-32.2-193.57-73.37-2.54-7.5-3.73-11-7.27-11s-4.73 3.5-7.27 11c-13.97 41.17-68.7 201.9-193.57 73.37-65.67-67.54-35.27-135.07 84.2-155.47-68.4 11.67-145.67-7.56-166.87-82.93C10.4 214.76 0 80.47 0 62.33 0-28.93 71.92-5.57 135.72 44.03Z"/>
+        </svg>
+      </a>
+
+      <!-- Email -->
+      <a href="mailto:YOUR_EMAIL_HERE" aria-label="Email the creators" title="Email the creators">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <polyline points="22,4 12,13 2,4"/>
+        </svg>
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero-block">
+      <p class="figure-label">Yesterday&hellip;</p>
+      <p class="figure-primary" id="figure-daily">$&mdash;</p>
+      <p class="figure-caption">in productive working time lost to NJ Transit delays</p>
+
+      <p class="figure-label">Since we started tracking in April 2026&hellip;</p>
+      <p class="figure-secondary" id="figure-cumulative">$&mdash;</p>
+      <p class="figure-caption-secondary">in total estimated losses to New Jersey commuters</p>
+
+      <p class="body-text">
+        Every weekday, we monitor NJ Transit commuter rail alerts and estimate
+        the economic cost of delays using the U.S. Department of Transportation&rsquo;s
+        Value of Travel Time methodology, adjusted for New Jersey&rsquo;s median
+        household income. At $24.00 per hour, a delayed train carrying 800 commuters
+        costs employers roughly $320 in lost productivity per minute. These figures
+        are estimates, not official accounting &mdash; but the delays are very real.
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <p class="footer-text">
+      An independent public accountability project. Data sourced from NJ Transit&rsquo;s
+      public MyTransit alert system via Bluesky. Updated daily on weekdays.
+      All figures are estimates based on USDOT Value of Travel Time methodology
+      and should not be taken as official accounting. Not affiliated with NJ Transit.
+    </p>
+  </footer>
+
+  <script>
+    // ============================================================
+    // CONFIGURATION — update these two values, then you're done.
+    // ============================================================
+    const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';  // the long string between /d/ and /edit in the sheet URL
+    const SHEET_NAME     = 'for_web';                    // the tab name that holds your numbers
+    const RANGE          = 'A1:A2';                      // A1 = yesterday's cost, A2 = cumulative total since launch
+    // ============================================================
+
+    // Build the Google Visualization API CSV export URL.
+    // Requires the sheet to be *published to the web* (File → Share → Publish to web).
+    const csvUrl =
+      `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}` +
+      `/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}&range=${RANGE}`;
+
+    const elDaily      = document.getElementById('figure-daily');
+    const elCumulative = document.getElementById('figure-cumulative');
+
+    // Add loading state
+    elDaily.classList.add('figure-loading');
+    elCumulative.classList.add('figure-loading');
+
+    /**
+     * Format a raw number as a dollar string: 1234567.89 → "$1,234,568"
+     * Rounds to the nearest whole dollar. Handles strings with stray
+     * quotes, dollar signs, or commas that Google Sheets may export.
+     */
+    function formatDollars(raw) {
+      const cleaned = String(raw).replace(/["$,\s]/g, '');
+      const num = parseFloat(cleaned);
+      if (isNaN(num)) return '$—';
+      return '$' + Math.round(num).toLocaleString('en-US');
+    }
+
+    fetch(csvUrl)
+      .then(res => {
+        if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
+        return res.text();
+      })
+      .then(csv => {
+        // CSV comes back as one value per line, each potentially quoted.
+        const rows = csv.trim().split('\n');
+        const daily      = rows[0] || '';
+        const cumulative = rows[1] || '';
+
+        elDaily.textContent      = formatDollars(daily);
+        elCumulative.textContent = formatDollars(cumulative);
+
+        elDaily.classList.remove('figure-loading');
+        elCumulative.classList.remove('figure-loading');
+      })
+      .catch(err => {
+        console.error('Could not load data from Google Sheets:', err);
+        elDaily.textContent      = '$—';
+        elCumulative.textContent = '$—';
+        elDaily.classList.remove('figure-loading');
+        elCumulative.classList.remove('figure-loading');
+      });
+  </script>
+
 </body>
 </html>
