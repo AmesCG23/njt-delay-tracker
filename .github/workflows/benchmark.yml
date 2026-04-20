@@ -1,0 +1,44 @@
+# benchmark.yml — Dry-run replay against a specified historical date
+#
+# Lets you run the full pipeline against a known past date to benchmark
+# new code changes against previously-observed delays. Always runs as
+# DRY_RUN=true — no Sheets writes, no tweet. Output goes to GitHub Actions log.
+#
+# Usage: Actions tab → "NJT Benchmark" → Run workflow → enter a date
+#
+# The date you enter becomes "yesterday" in the pipeline, so the script
+# fetches morning (09:00–16:00 UTC) and evening (19:00–01:00 UTC) windows
+# for that date from Bluesky's permanent post history.
+
+name: NJT Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date to benchmark (YYYY-MM-DD, e.g. 2026-04-15)"
+        required: true
+        type: string
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Run benchmark
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # No Sheets or Bluesky credentials needed — DRY_RUN skips all writes
+          OVERRIDE_DATE: ${{ github.event.inputs.date }}
+          DRY_RUN: "true"
+        run: |
+          echo "BENCHMARK DATE: $OVERRIDE_DATE"
+          echo "DRY_RUN=true (no writes, no tweet)"
+          python src/daily.py
