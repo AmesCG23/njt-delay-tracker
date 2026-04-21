@@ -30,8 +30,8 @@ ALERT_ACCOUNTS = [
     ("njtransit-mbpj.bsky.social", "Main/Bergen County"),
 ]
 
-# Fetch this many posts per account per run.
-# 100 is the API max and comfortably covers a full rush window.
+# Posts to fetch per API call (100 is the Bluesky API max per request).
+# Pagination means we'll make multiple calls if the window isn't covered.
 POSTS_PER_ACCOUNT = 100
 
 # ── Filters ───────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ RAIL_LINE_SIGNALS = [
     "north jersey coast", "njcl", "nj coast", "coast line", "jersey coast line",
     "morris & essex", "morris and essex", "m and e", "m&e",
     "montclair-boonton", "montclair boonton", "mobo",
-    "main/bergen", "main bergen", "mbpj",
+    "main/bergen", "main bergen", "mbpj", "main line", "bergen county line", "bergen line", "main-bergen",
     "raritan valley", "rvl",
     "pascack valley", "pvl",
     "port jervis",
@@ -63,27 +63,72 @@ def make_client():
     return Client(base_url="https://public.api.bsky.app")
 
 
-def fetch_account_posts(client, handle, limit=100):
-    """Fetch recent posts from a Bluesky account."""
-    try:
-        response = client.app.bsky.feed.get_author_feed(
-            params={
+def fetch_account_posts(client, handle, window_start_utc, limit=100, max_posts=500):
+    """
+    Fetch posts from a Bluesky account, paginating until we reach posts
+    older than the window start or hit max_posts.
+
+    njmetroalert.bsky.social posts alerts for ALL NJT services — bus,
+    light rail, and rail. On a bad day it can post 200+ alerts, pushing
+    morning rail alerts beyond the first 100 posts by the time we run
+    at ~5pm ET. Pagination ensures we always reach back far enough.
+
+    max_posts is a safety cap to avoid runaway API calls. 500 posts
+    covers roughly 8-10 hours of even a very active alert account.
+    """
+    posts = []
+    cursor = None
+    batch = 0
+
+    while len(posts) < max_posts:
+        try:
+            params = {
                 "actor": handle,
                 "limit": limit,
                 "filter": "posts_no_replies",
             }
-        )
-        posts = []
-        for item in response.feed:
-            post = item.post
-            uri = post.uri
-            text = post.record.text if hasattr(post.record, "text") else ""
-            created_at = post.record.created_at
-            posts.append((uri, text, created_at))
-        return posts
-    except Exception as e:
-        print(f"[WATCHER] Could not fetch posts from @{handle}: {e}")
-        return []
+            if cursor:
+                params["cursor"] = cursor
+
+            response = client.app.bsky.feed.get_author_feed(params=params)
+
+            if not response.feed:
+                break  # no more posts
+
+            batch += 1
+            oldest_in_batch = None
+
+            for item in response.feed:
+                post = item.post
+                uri = post.uri
+                text = post.record.text if hasattr(post.record, "text") else ""
+                created_at = post.record.created_at
+                posts.append((uri, text, created_at))
+                oldest_in_batch = created_at
+
+            # Check if the oldest post in this batch predates our window start.
+            # If so, we have everything we need — stop paginating.
+            if oldest_in_batch:
+                oldest_dt = parse_timestamp(oldest_in_batch)
+                if oldest_dt and oldest_dt < window_start_utc:
+                    print(f"[WATCHER] @{handle}: reached posts before window "
+                          f"after {batch} batch(es), {len(posts)} posts total.")
+                    break
+
+            # If the API returned fewer posts than the limit, we've hit the end
+            if len(response.feed) < limit:
+                break
+
+            # Advance cursor for next page
+            cursor = getattr(response, "cursor", None)
+            if not cursor:
+                break
+
+        except Exception as e:
+            print(f"[WATCHER] Could not fetch posts from @{handle}: {e}")
+            break
+
+    return posts
 
 
 def parse_timestamp(ts_str):
@@ -215,7 +260,7 @@ def is_line_suspension_alert(text):
         "north jersey coast", "njcl", "nj coast", "coast line", "jersey coast line",
         "morris & essex", "morris and essex", "m and e", "m&e", "m and e", "m&e",
         "montclair-boonton", "montclair boonton", "mobo",
-        "main/bergen", "main bergen", "mbpj",
+        "main/bergen", "main bergen", "mbpj", "main line", "bergen county line", "bergen line", "main-bergen",
         "raritan valley", "rvl",
         "pascack valley", "pvl",
         "port jervis",
@@ -262,6 +307,10 @@ def identify_line(text, line_hint=None):
         "main/bergen": "Main/Bergen County",
         "main bergen": "Main/Bergen County",
         "mbpj": "Main/Bergen County",
+        "main line": "Main/Bergen County",
+        "bergen county line": "Main/Bergen County",
+        "bergen line": "Main/Bergen County",
+        "main-bergen": "Main/Bergen County",
         "raritan valley": "Raritan Valley",
         "rvl": "Raritan Valley",
         "pascack valley": "Pascack Valley",
@@ -294,7 +343,7 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
     candidates = []
 
     for handle, line_hint in ALERT_ACCOUNTS:
-        posts = fetch_account_posts(client, handle, limit=POSTS_PER_ACCOUNT)
+        posts = fetch_account_posts(client, handle, window_start_utc, limit=POSTS_PER_ACCOUNT)
         in_window_count = 0
 
         for uri, text, created_at in posts:
