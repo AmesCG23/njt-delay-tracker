@@ -25,6 +25,7 @@ from atproto import Client
 ALERT_ACCOUNTS = [
     ("njmetroalert.bsky.social", None),                    # All lines — primary
     ("njtransit--nec.bsky.social", "Northeast Corridor"),  # NEC double-coverage
+    ("njtransit-njcl.bsky.social", "North Jersey Coast"),  # NJCL double-coverage
     ("njtransit-me.bsky.social", "Morris & Essex"),
     ("njtransit-mobo.bsky.social", "Montclair-Boonton"),
     ("njtransit-mbpj.bsky.social", "Main/Bergen County"),
