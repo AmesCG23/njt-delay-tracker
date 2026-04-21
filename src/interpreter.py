@@ -84,6 +84,7 @@ Rules:
         )
 
         raw = message.content[0].text.strip()
+        print(f"[INTERPRETER] Haiku raw response: {raw[:200]}")
 
         # Strip markdown code fences if present
         if raw.startswith("```"):
@@ -96,10 +97,17 @@ Rules:
 
         # If Claude says this isn't actually a delay, skip it
         if parsed is None:
+            print(f"[INTERPRETER] Haiku returned null for entire response.")
             return None
+
+        print(f"[INTERPRETER] Parsed: line={parsed.get('line')} | "
+              f"delay={parsed.get('delay_minutes')} | "
+              f"train={parsed.get('train_number')} | "
+              f"cancel={parsed.get('is_cancellation')}")
 
         # Use the hint from the Watcher if Claude couldn't parse minutes
         if parsed.get("delay_minutes") is None and delay_minutes_hint is not None:
+            print(f"[INTERPRETER] delay_minutes was null — using watcher hint: {delay_minutes_hint}")
             parsed["delay_minutes"] = delay_minutes_hint
 
         # Add time band and raw text
@@ -110,7 +118,7 @@ Rules:
         return parsed
 
     except (json.JSONDecodeError, KeyError, IndexError) as e:
-        print(f"[INTERPRETER] Failed to parse Claude response: {e}")
+        print(f"[INTERPRETER] Failed to parse Haiku response: {e}")
         print(f"[INTERPRETER] Raw response was: {raw if 'raw' in locals() else 'N/A'}")
         return None
     except anthropic.APIError as e:

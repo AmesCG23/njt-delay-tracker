@@ -185,6 +185,15 @@ def calculate_window(deduped_delays):
     calculated = []
     for event in deduped_delays:
         try:
+            # If interpreter left delay_minutes null but watcher had it, fill it in
+            # before sending to calculator — prevents silent None returns from calculate_cost
+            if (not event.get("system_wide") and
+                    not event.get("line_suspension") and
+                    not event.get("is_cancellation") and
+                    event.get("delay_minutes") is None):
+                print(f"[DAILY] delay_minutes null in calculator input — event may be dropped: "
+                      f"{event.get('line')} train #{event.get('train_number')}")
+
             if event.get("system_wide") and not event.get("line_suspension"):
                 result = calculate_system_wide_cost(event)
             elif event.get("line_suspension"):
