@@ -233,18 +233,16 @@
 
   <script>
     // ============================================================
-    // CONFIGURATION — update these two values, then you're done.
+    // CONFIGURATION
     // ============================================================
-    const SPREADSHEET_ID = '1tKwhD45M7S7_geZeHzPL6Msl_tJPl5Cb67LwYIoRPXw';  // the long string between /d/ and /edit in the sheet URL
-    const SHEET_NAME     = 'for_web';                    // the tab name that holds your numbers
-    const RANGE          = 'A1:A3';                      // A1 = yesterday's cost, A2 = cumulative total, A3 = yesterday's person-hours
+    const PUBLISHED_ID = '2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce';
+    const SHEET_GID    = '1868128114';  // GID of the for_web tab
     // ============================================================
 
-    // Build the Google Visualization API CSV export URL.
-    // Requires the sheet to be *published to the web* (File → Share → Publish to web).
+    // Published CSV URL — works with sheets published via File → Share → Publish to web.
     const csvUrl =
-      `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}` +
-      `/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}&range=${RANGE}`;
+      `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_ID}` +
+      `/pub?output=csv&gid=${SHEET_GID}`;
 
     const elDaily       = document.getElementById('figure-daily');
     const elCumulative  = document.getElementById('figure-cumulative');
