@@ -169,7 +169,7 @@ if __name__ == "__main__":
 TWEET_LOG_TAB = "Tweet_log"
 
 
-def log_tweet(text, total_cost, event_count, uri=None):
+def log_tweet(text, total_cost, event_count, uri=None, person_hours=0):
     """
     Append the daily summary tweet to the Tweet_log tab.
     Creates the tab and headers automatically if they don't exist.
@@ -217,7 +217,8 @@ def log_tweet(text, total_cost, event_count, uri=None):
         try:
             for_web = spreadsheet.worksheet("for_web")
             for_web.update("A1", [[round(total_cost)]])
-            print(f"[LOGGER] for_web!A1 updated: {round(total_cost)}")
+            for_web.update("A3", [[round(person_hours)]])
+            print(f"[LOGGER] for_web updated: A1={round(total_cost)}, A3={round(person_hours)}")
         except gspread.WorksheetNotFound:
             print("[LOGGER] for_web tab not found — create it manually and publish to web.")
         except Exception as web_err:
