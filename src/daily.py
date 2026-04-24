@@ -301,14 +301,13 @@ def format_tweet(yesterday_et, totals):
     )
 
     footer = (
-        f"({event_count} delay event{'s' if event_count != 1 else ''} "
-        f"across {line_count} line{'s' if line_count != 1 else ''})"
+        f"(Estimate based on {event_count} delay event{'s' if event_count != 1 else ''})"
     )
 
     post = (
         f"On {day_name}, NJ Transit delayed commuters for a total of "
-        f"{time_str} across both rush hours. "
-        f"City employers lost {cost_str} in productive working time. "
+        f"{time_str} across the morning and afternoon rush hours. "
+        f"City employers lost out on working time conservatively valued at {cost_str}. "
         f"{footer}"
     )
 
