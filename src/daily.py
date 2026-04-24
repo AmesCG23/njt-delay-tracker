@@ -427,6 +427,7 @@ def run():
                 total_cost=totals["total_cost"],
                 event_count=totals["event_count"],
                 uri=uri,
+                person_hours=totals["total_person_hours"],
             )
         except Exception as e:
             print(f"[DAILY] Tweet_log write failed: {e}")
