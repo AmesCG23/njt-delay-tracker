@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="176" height="40" viewBox="0 0 176 40" role="img" aria-label="NJT Delay Tracker">
+  <text x="0" y="27" font-family="'EB Garamond', Georgia, 'Times New Roman', serif" font-size="19" font-weight="600" fill="#1a1a1a" letter-spacing="0.4">NJT</text>
+  <text x="46" y="27" font-family="'EB Garamond', Georgia, 'Times New Roman', serif" font-size="22" font-weight="700" fill="#C8860A">/</text>
+  <text x="59" y="27" font-family="'EB Garamond', Georgia, 'Times New Roman', serif" font-size="19" font-weight="400" font-style="italic" fill="#1a1a1a">Delay Tracker</text>
+</svg>
