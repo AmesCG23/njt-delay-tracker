@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Methodology — NJ Transit Delay Cost Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --newsprint: #f0eeeb;
+      --ink: #1a1a1a;
+      --ink-light: #4a4a4a;
+      --ink-faint: #8a8a8a;
+      --rule: #c0bdb8;
+    }
+
+    body {
+      font-family: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+      background-color: var(--newsprint);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* === HEADER === */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+    }
+
+    .logo img {
+      height: 64px;
+      width: auto;
+      display: block;
+    }
+
+    .social-icons {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .social-icons a {
+      color: var(--ink-light);
+      text-decoration: none;
+      transition: color 0.2s ease;
+      display: flex;
+      align-items: center;
+    }
+
+    .social-icons a:hover {
+      color: var(--ink);
+    }
+
+    .social-icons svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    /* === MAIN CONTENT === */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 2rem 3rem;
+    }
+
+    .content-block {
+      max-width: 640px;
+      width: 100%;
+    }
+
+    .page-title {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-align: center;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .body-text {
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: var(--ink);
+    }
+
+    .body-text a {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .body-text a:hover {
+      color: var(--ink-light);
+    }
+
+    .construction-block {
+      text-align: center;
+      margin: 2.5rem 0;
+    }
+
+    .construction-block img {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* === FOOTER === */
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 1.25rem 2rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .footer-text a {
+      color: var(--ink-faint);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .footer-text a:hover {
+      color: var(--ink-light);
+    }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 600px) {
+      header {
+        padding: 1rem 1.25rem;
+      }
+
+      main {
+        padding: 1.5rem 1.25rem 2rem;
+      }
+
+      .page-title {
+        font-size: 1.6rem;
+      }
+
+      footer {
+        padding: 1rem 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <img src="njt-delay-tracker-logo.svg" alt="NJT Delay Tracker">
+    </div>
+
+    <nav class="social-icons">
+      <a href="https://bsky.app/profile/njtdelaytracker.bsky.social" aria-label="Bluesky" title="Follow on Bluesky">
+        <svg viewBox="0 0 600 530" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M135.72 44.03C202.22 93.87 273.72 195.17 300 249.57c26.28-54.4 97.78-155.7 164.28-205.54C528.08-5.57 600-28.93 600 62.33c0 18.14-10.4 152.43-16.5 174.13-21.2 75.37-98.47 94.6-166.87 82.93 119.47 20.4 149.87 87.93 84.2 155.47-124.87 128.53-179.6-32.2-193.57-73.37-2.54-7.5-3.73-11-7.27-11s-4.73 3.5-7.27 11c-13.97 41.17-68.7 201.9-193.57 73.37-65.67-67.54-35.27-135.07 84.2-155.47-68.4 11.67-145.67-7.56-166.87-82.93C10.4 214.76 0 80.47 0 62.33 0-28.93 71.92-5.57 135.72 44.03Z"/>
+        </svg>
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="content-block">
+
+      <h1 class="page-title">Methodology</h1>
+
+      <p class="body-text">
+        Our estimates are based on ridership estimates obtained through an OPRA request that someone <a href="https://www.reddit.com/r/nycrail/comments/1jyki9k/nj_transit_boarding_data_by_line_station/">kindly posted to reddit</a>.
+        We ballpark peak ridership on key lines as around 800&ndash;1000 (NEC) and 500 (M&amp;E, MoBo).
+        &ldquo;Cost&rdquo; of lost time is based on Department of Transportation estimates of the value of time spent in transit and prevailing New Jersey hourly rates, which we assume are higher for commuters than the average resident.
+        Alerts are scraped from Bluesky pages that repost regular NJT delay alerts. We deduplicate to avoid counting the same delay twice, taking the highest reported delay.
+        We are constantly improving our methodology and welcome feedback.
+        The raw boarding data from that OPRA request is <a href="opra-njt-files/NJT OPRA Ridership Data.zip">available to download here</a>.
+      </p>
+
+      <div class="construction-block">
+        <img src="under-construction.gif" alt="Under Construction" width="200" height="80">
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <p class="footer-text">
+      &larr; <a href="index.html">Back to the main page</a>
+    </p>
+  </footer>
+
+</body>
+</html>
