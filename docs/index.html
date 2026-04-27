@@ -157,6 +157,35 @@
       margin: 0 auto;
     }
 
+    .footer-text a {
+      color: var(--ink-faint);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      transition: color 0.2s ease;
+    }
+
+    .footer-text a:hover {
+      color: var(--ink-light);
+    }
+
+    .footer-kofi {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+      max-width: 600px;
+      margin: 1rem auto 0;
+    }
+
+    .footer-kofi a {
+      color: var(--ink-faint);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .footer-kofi a:hover {
+      color: #FF5E5B;
+    }
+
     /* === LOADING STATE === */
     .figure-loading {
       opacity: 0.3;
@@ -252,6 +281,9 @@
     </p>
     <p class="footer-text">
       A full explanation of our methodology &mdash; including ridership estimates, the value-of-time calculation, and how we deduplicate alerts &mdash; is available on our <a href="methodology.html">methodology page</a>.
+    </p>
+    <p class="footer-kofi">
+      If this project is useful to you, consider <a href="https://ko-fi.com/bettertrains" target="_blank" rel="noopener">buying us a coffee on Ko-fi</a> to help keep it running.
     </p>
   </footer>
 
