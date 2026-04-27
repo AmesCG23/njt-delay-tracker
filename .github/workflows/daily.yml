@@ -5,9 +5,9 @@
 # since we're summarizing YESTERDAY's delays which are fully in the past.
 #
 # What it does:
-#   1. Fetches yesterday morning (5am–noon ET) from Bluesky
+#   1. Fetches yesterday morning (5:00–10:30 AM ET) from Bluesky
 #   2. Interprets, deduplicates, calculates, logs to Sheets
-#   3. Fetches yesterday evening (3pm–9pm ET) from Bluesky
+#   3. Fetches yesterday evening (3:00–8:30 PM ET) from Bluesky
 #   4. Interprets, deduplicates, calculates, logs to Sheets
 #   5. Posts one daily summary tweet
 #   6. Logs the tweet to the Tweet_log tab
