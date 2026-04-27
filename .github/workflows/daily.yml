@@ -1,8 +1,9 @@
 # daily.yml — One daily run, Mon–Fri
 #
-# Scheduled at 19:00 UTC, targeting ~3pm ET actual.
-# With ~2h GitHub delay, expects to fire around 5pm ET — still fine,
-# since we're summarizing YESTERDAY's delays which are fully in the past.
+# Scheduled at 20:00 UTC: 3pm ET in winter (EST), 4pm ET in summer (EDT).
+# GitHub Actions cron is UTC-only and can't track DST, so this is the
+# closest single expression to "3pm ET year-round."
+# With ~2h GitHub delay, expects to fire around 4–5pm ET actual.
 #
 # What it does:
 #   1. Fetches yesterday morning (5:00–10:30 AM ET) from Bluesky
@@ -16,7 +17,7 @@ name: NJT Daily Pipeline
 
 on:
   schedule:
-    - cron: "0 19 * * 2-6"
+    - cron: "0 20 * * 2-6"
   workflow_dispatch:
     inputs:
       dry_run:
