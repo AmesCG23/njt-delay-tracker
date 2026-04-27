@@ -10,3 +10,6 @@ anthropic==0.40.0
 # Google Sheets (logging events)
 gspread==6.1.2
 google-auth==2.29.0
+
+# Timezone database — provides IANA data for zoneinfo on minimal Linux runners
+tzdata==2025.2

@@ -252,7 +252,7 @@
     <div class="hero-block">
       <p class="hero-lede">Every day NJ Transit runs late, and every day New Jersey commuters and New York City employers absorb the cost. <em>Here&rsquo;s how much.</em></p>
 
-      <p class="figure-label">Yesterday, New Jersey Transit delays cost commuters and New York City employers more than:</p>
+      <p class="figure-label" id="figure-label-daily">Yesterday, New Jersey Transit delays cost commuters and New York City employers more than:</p>
       <p class="figure-primary" id="figure-daily">$&mdash;</p>
       <p class="figure-caption">in productive time, based on <strong id="figure-person-hours">&mdash;</strong> total hours of delays.</p>
 
@@ -295,6 +295,16 @@
     const PUBLISHED_ID = '2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce';
     const SHEET_GID    = '1868128114';  // GID of the for_web tab
     // ============================================================
+
+    // "Yesterday," Tue–Sat; "Last Friday," Sun–Mon (data always reflects last business day)
+    (function () {
+      const label = document.getElementById('figure-label-daily');
+      if (!label) return;
+      const day = new Date().getDay(); // 0 = Sun, 1 = Mon
+      const prefix = (day === 0 || day === 1) ? 'Last Friday,' : 'Yesterday,';
+      label.textContent =
+        prefix + ' New Jersey Transit delays cost commuters and New York City employers more than:';
+    })();
 
     // Published CSV URL — works with sheets published via File → Share → Publish to web.
     const csvUrl =

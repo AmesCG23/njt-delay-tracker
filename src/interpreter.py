@@ -10,12 +10,13 @@ This is the only part of the pipeline that calls the Claude API.
 import anthropic
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 # Time bands for ridership lookup
 def get_time_band():
-    """Returns 'peak', 'off_peak', or 'weekend' based on current time."""
-    now = datetime.now()
+    """Returns 'peak', 'off_peak', or 'weekend' based on current Eastern Time."""
+    now = datetime.now(ZoneInfo("America/New_York"))
     hour = now.hour
     weekday = now.weekday()  # 0=Monday, 6=Sunday
 
@@ -105,7 +106,7 @@ Rules:
         # Add time band and raw text
         parsed["time_band"] = get_time_band()
         parsed["raw_text"] = alert_text
-        parsed["timestamp"] = datetime.now().isoformat()
+        parsed["timestamp"] = datetime.now(timezone.utc).isoformat()
 
         return parsed
 
