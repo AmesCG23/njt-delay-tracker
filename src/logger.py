@@ -12,7 +12,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
 
 
 # ── Google Sheets setup ───────────────────────────────────────────────────────
@@ -62,14 +65,16 @@ def ensure_headers(worksheet):
 
 def _build_event_row(delay_data):
     """Build a single Event Log row from a delay dict."""
-    ts = delay_data.get("timestamp", datetime.now().isoformat())
+    ts = delay_data.get("timestamp", datetime.now(_ET).isoformat())
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        date_str = dt.strftime("%Y-%m-%d")
-        time_str = dt.strftime("%H:%M")
+        et = dt.astimezone(_ET)
+        date_str = et.strftime("%Y-%m-%d")
+        time_str = et.strftime("%H:%M")
     except (ValueError, TypeError, AttributeError):
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        time_str = datetime.now().strftime("%H:%M")
+        now_et = datetime.now(_ET)
+        date_str = now_et.strftime("%Y-%m-%d")
+        time_str = now_et.strftime("%H:%M")
 
     return [
         date_str,
@@ -159,7 +164,7 @@ if __name__ == "__main__":
         "estimated_riders": 825,
         "dollar_estimate": 11220.00,
         "raw_text": "NEC train #3876, the 9:28 PM arrival to PSNY, is up to 34 min. late due to mechanical issues.",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(_ET).isoformat(),
     }
 
     running_total = log_delay(test_delay)
@@ -204,7 +209,7 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0):
 
         # Append the row
         row = [
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S"),
             text,
             f"${total_cost:,.2f}",
             event_count,
@@ -292,7 +297,7 @@ def log_run(period, raw_count, dedup_count, total_cost, post_uri=None):
     if not sheet_id:
         raise ValueError("GOOGLE_SHEET_ID not set.")
 
-    now = datetime.now()
+    now = datetime.now(_ET)
 
     try:
         client = get_sheet_client()
@@ -414,16 +419,16 @@ def log_alert_batch(interpreted_events):
         from calculator import VTTS_RATE, RIDERS_PER_TRAIN, PENN_STATION_RIDERS_PER_HOUR
 
         rows = []
-        date_seen = datetime.now().strftime("%Y-%m-%d")
+        date_seen = datetime.now(_ET).strftime("%Y-%m-%d")
 
         for event in interpreted_events:
-            # Parse alert timestamp for date/time columns
+            # Parse alert timestamp, display in ET
             try:
-                from datetime import timezone
                 ts_str = event.get("timestamp", "")
                 ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                alert_date = ts.strftime("%Y-%m-%d")
-                alert_time = ts.strftime("%H:%M")
+                et = ts.astimezone(_ET)
+                alert_date = et.strftime("%Y-%m-%d")
+                alert_time = et.strftime("%H:%M")
             except (ValueError, AttributeError):
                 alert_date = ""
                 alert_time = ""

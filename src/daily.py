@@ -20,15 +20,18 @@ After both windows:
   7. Post one tweet
   8. Log tweet to Tweet_log tab
 
-Windows (EDT = UTC-4):
-  Morning: 5:00am–12:00pm ET = 09:00–16:00 UTC
-  Evening: 3:00pm–9:00pm ET  = 19:00–01:00 UTC (crosses midnight)
+Windows (ET — ZoneInfo handles EST/EDT automatically):
+  Morning: 5:00 AM–10:30 AM ET
+  Evening: 3:00 PM– 8:30 PM ET
 """
 
 import sys
 import os
 import traceback
 from datetime import datetime, timezone, timedelta, date
+from zoneinfo import ZoneInfo
+
+ET = ZoneInfo("America/New_York")
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -56,14 +59,17 @@ def get_yesterday_windows():
     """
     Return yesterday's morning and evening UTC windows.
 
-    At 19:00 UTC (3pm EDT), the ET date equals the UTC date.
-    Yesterday ET = UTC date - 1. The evening window ends at 01:00 UTC
-    on the day after yesterday, which is in the past by the time we run.
+    Windows are defined in Eastern Time and converted to UTC so that
+    ZoneInfo("America/New_York") handles the EST/EDT offset automatically —
+    no hardcoded ±4 or ±5 anywhere.
+
+      Morning: 5:00 AM–10:30 AM ET
+      Evening: 3:00 PM– 8:30 PM ET  (same ET calendar day, no midnight crossing)
 
     If OVERRIDE_DATE is set (YYYY-MM-DD), that date is used as "yesterday"
     directly — used by the benchmark workflow to replay a known date.
     """
-    now_utc = datetime.now(timezone.utc)
+    now_et = datetime.now(ET)
 
     if OVERRIDE_DATE:
         try:
@@ -71,26 +77,23 @@ def get_yesterday_windows():
             print(f"[DAILY] OVERRIDE_DATE set — using {yesterday_et} as yesterday")
         except ValueError:
             print(f"[DAILY] Invalid OVERRIDE_DATE '{OVERRIDE_DATE}' — falling back to yesterday")
-            et_date_now = (now_utc - timedelta(hours=4)).date()
-            yesterday_et = et_date_now - timedelta(days=1)
+            yesterday_et = now_et.date() - timedelta(days=1)
     else:
-        # ET date at run time (EDT = UTC-4)
-        et_date_now = (now_utc - timedelta(hours=4)).date()
-        yesterday_et = et_date_now - timedelta(days=1)
+        yesterday_et = now_et.date() - timedelta(days=1)
 
     y = yesterday_et
-    y_next = yesterday_et + timedelta(days=1)
 
-    morning_start = datetime(y.year,      y.month,      y.day,      9,  0, tzinfo=timezone.utc)
-    morning_end   = datetime(y.year,      y.month,      y.day,      16, 0, tzinfo=timezone.utc)
-    evening_start = datetime(y.year,      y.month,      y.day,      19, 0, tzinfo=timezone.utc)
-    evening_end   = datetime(y_next.year, y_next.month, y_next.day, 1,  0, tzinfo=timezone.utc)
+    # Build in ET — astimezone(UTC) converts correctly for whichever offset is in effect
+    morning_start = datetime(y.year, y.month, y.day,  5,  0, tzinfo=ET).astimezone(timezone.utc)
+    morning_end   = datetime(y.year, y.month, y.day, 10, 30, tzinfo=ET).astimezone(timezone.utc)
+    evening_start = datetime(y.year, y.month, y.day, 15,  0, tzinfo=ET).astimezone(timezone.utc)
+    evening_end   = datetime(y.year, y.month, y.day, 20, 30, tzinfo=ET).astimezone(timezone.utc)
 
     print(f"[DAILY] Yesterday (ET): {yesterday_et}")
     print(f"[DAILY] Morning window: {morning_start.strftime('%Y-%m-%d %H:%M')} – "
-          f"{morning_end.strftime('%Y-%m-%d %H:%M')} UTC")
+          f"{morning_end.strftime('%Y-%m-%d %H:%M')} UTC  (5:00–10:30 AM ET)")
     print(f"[DAILY] Evening window: {evening_start.strftime('%Y-%m-%d %H:%M')} – "
-          f"{evening_end.strftime('%Y-%m-%d %H:%M')} UTC")
+          f"{evening_end.strftime('%Y-%m-%d %H:%M')} UTC  (3:00–8:30 PM ET)")
 
     return yesterday_et, morning_start, morning_end, evening_start, evening_end
 
@@ -340,7 +343,7 @@ def post_to_bluesky(text):
 
 def run():
     print(f"\n{'='*60}")
-    print(f"NJT DAILY PIPELINE — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"NJT DAILY PIPELINE — {datetime.now(ET).strftime('%Y-%m-%d %H:%M:%S ET')}")
     if DRY_RUN:
         print("*** DRY RUN — no Sheets writes, no tweet ***")
     print(f"{'='*60}")
@@ -416,7 +419,7 @@ def run():
 
     if not DRY_RUN:
         uri = post_to_bluesky(tweet_text)
-        now = datetime.now()
+        now = datetime.now(ET)
         post_date = now.strftime("%Y-%m-%d")
         post_time = now.strftime("%H:%M:%S")
 

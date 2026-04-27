@@ -98,6 +98,7 @@ def deduplicate_by_train(delays):
     - Events with no train number and not system-wide: kept as-is
     """
     from datetime import datetime, timezone, timedelta
+    from zoneinfo import ZoneInfo
 
     best_trains = {}    # (train_number, date) → entry
     best_syswide = {}   # (line, date) → entry  for system-wide events
@@ -112,7 +113,7 @@ def deduplicate_by_train(delays):
             ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
-            date_str = (ts - timedelta(hours=4)).strftime("%Y-%m-%d")
+            date_str = ts.astimezone(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
         except (ValueError, TypeError, AttributeError):
             date_str = "unknown"
 
