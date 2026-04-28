@@ -120,6 +120,16 @@
       image-rendering: crisp-edges;
     }
 
+    hr.section-rule {
+      border: none;
+      border-top: 1px solid var(--rule);
+      margin: 2rem 0;
+    }
+
+    .body-text + .body-text {
+      margin-top: 1.1rem;
+    }
+
     /* === FOOTER === */
     footer {
       border-top: 1px solid var(--rule);
@@ -193,6 +203,24 @@
         Alerts are scraped from Bluesky pages that repost regular NJT delay alerts. We deduplicate to avoid counting the same delay twice, taking the highest reported delay.
         We are constantly improving our methodology and welcome feedback.
         The raw boarding data from that OPRA request is <a href="opra-njt-files/NJT OPRA Ridership Data.zip">available to download here</a>.
+      </p>
+
+      <hr class="section-rule">
+
+      <p class="body-text">
+        <strong>AI use statement:</strong> This website and the NJT / Delay Tracker architecture were proudly vibe-coded with Claude and Claude Code. I&rsquo;m a policy lawyer with a family, a full-time job, and &ldquo;limited&rdquo; coding experience at best. Since I also don&rsquo;t have the money to hire a software engineer, the alternative to using AI was not launching the project.
+      </p>
+
+      <p class="body-text">
+        I&rsquo;m skeptical of many ways people and companies use AI, but believe that democratizing access to technology for projects like this one is a valid and socially beneficial use case. While I understand if you disagree, I hope you&rsquo;ll still support the project and its goals.
+      </p>
+
+      <p class="body-text">
+        Our methodology, however, is a different story. I believe that you, the reader, need to be able to trust every component of policy analysis. That means a human hand on the tiller. Accordingly, our code output has been rigorously checked by hand &mdash; ticking NJT alerts I observe in the relevant timeframe against a spreadsheet of the scraper&rsquo;s output, the old-fashioned way. And our methodology was built and validated by me, with AI analysis of GTFS as a secondary gut check.
+      </p>
+
+      <p class="body-text">
+        I&rsquo;d love to improve our methodology. If you have ideas, please review the estimation process above and get in touch.
       </p>
 
       <div class="construction-block">
