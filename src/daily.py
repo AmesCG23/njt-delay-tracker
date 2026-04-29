@@ -364,13 +364,13 @@ def run():
 
     # ── Morning window ────────────────────────────────────────────────────────
     morning_events, _morning_raw_count = process_window("morning", morn_start, morn_end)
+    morning_totals = calculate_totals(morning_events)
 
     if not DRY_RUN:
         try:
             log_delay_batch(morning_events)
         except Exception as e:
             print(f"[DAILY] Sheet log failed (morning batch): {e}")
-        morning_totals = calculate_totals(morning_events)
         try:
             log_run("morning",
                     raw_count=_morning_raw_count,
@@ -383,13 +383,13 @@ def run():
 
     # ── Evening window ────────────────────────────────────────────────────────
     evening_events, _evening_raw_count = process_window("evening", eve_start, eve_end)
+    evening_totals = calculate_totals(evening_events)
 
     if not DRY_RUN:
         try:
             log_delay_batch(evening_events)
         except Exception as e:
             print(f"[DAILY] Sheet log failed (evening batch): {e}")
-        evening_totals = calculate_totals(evening_events)
         try:
             log_run("evening",
                     raw_count=_evening_raw_count,
@@ -431,6 +431,8 @@ def run():
                 event_count=totals["event_count"],
                 uri=uri,
                 person_hours=totals["total_person_hours"],
+                morning_cost=morning_totals["total_cost"],
+                evening_cost=evening_totals["total_cost"],
             )
         except Exception as e:
             print(f"[DAILY] Tweet_log write failed: {e}")
