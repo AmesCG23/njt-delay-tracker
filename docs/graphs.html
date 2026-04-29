@@ -398,6 +398,50 @@
       </div>
     </div>
 
+    <!-- Featured chart: Hours of delay over time (real data) -->
+    <div class="chart-section">
+      <p class="chart-title">Hours of observed delays, by day</p>
+      <p class="chart-desc">
+        Person-hours of delay per weekday, sourced from NJ Transit service alerts.
+        Weekends are omitted. Hover over any point for details.
+      </p>
+
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-avg">&mdash;</span>
+          <span class="ms-label">avg hrs / day</span>
+        </div>
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-peak">&mdash;</span>
+          <span class="ms-label" id="ms-peak-label">peak day</span>
+        </div>
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-total">&mdash;</span>
+          <span class="ms-label">total person-hrs</span>
+        </div>
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-days">&mdash;</span>
+          <span class="ms-label">days tracked</span>
+        </div>
+      </div>
+
+      <div class="chart-controls">
+        <div class="btn-group">
+          <button class="ctrl-btn" id="btn-ma" disabled title="Toggle 3-day centered moving average">3-day avg</button>
+        </div>
+        <div class="btn-group">
+          <button class="ctrl-btn" id="btn-csv" disabled title="Download underlying data as CSV">&darr; Export CSV</button>
+          <button class="ctrl-btn" id="btn-png" disabled title="Download chart as PNG image">&darr; Export PNG</button>
+        </div>
+      </div>
+
+      <div class="chart-wrap-main" id="wrap-hours">
+        <div class="chart-tooltip" id="tooltip-hours"></div>
+        <div class="chart-status" id="status-hours">Loading delay data&hellip;</div>
+        <canvas id="chart-hours" style="display:none;"></canvas>
+      </div>
+    </div>
+
     <hr class="section-rule">
 
     <!-- Chart 1: Daily cost over time -->
