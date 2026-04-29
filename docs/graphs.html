@@ -196,6 +196,138 @@
       color: var(--ink-light);
     }
 
+    /* === FEATURED CHART: mini-stats === */
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .mini-stat {
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 0.75rem 0.6rem;
+      text-align: center;
+    }
+
+    .ms-val {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+
+    .ms-label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      margin-top: 0.25rem;
+      line-height: 1.3;
+    }
+
+    /* === FEATURED CHART: controls === */
+    .chart-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .ctrl-btn {
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 0.82rem;
+      color: var(--ink-light);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 0.28rem 0.65rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .ctrl-btn:hover {
+      border-color: var(--ink-light);
+      color: var(--ink);
+    }
+
+    .ctrl-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    /* === FEATURED CHART: wrap + canvas === */
+    .chart-wrap-main {
+      position: relative;
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 1.25rem 1rem 1rem;
+      min-height: 260px;
+    }
+
+    /* === CUSTOM TOOLTIP === */
+    .chart-tooltip {
+      position: absolute;
+      background: var(--ink);
+      color: #fff;
+      padding: 0.55rem 0.8rem;
+      border-radius: 2px;
+      font-family: 'EB Garamond', Georgia, serif;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 10;
+      transition: opacity 0.12s;
+      opacity: 0;
+    }
+
+    .tt-date {
+      font-size: 0.72rem;
+      color: #bbb;
+      margin-bottom: 0.15rem;
+    }
+
+    .tt-value {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .tt-compare {
+      font-size: 0.72rem;
+      color: #bbb;
+      font-style: italic;
+      margin-top: 0.1rem;
+    }
+
+    /* === LOADING / ERROR === */
+    .chart-status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
     /* === RESPONSIVE === */
     @media (max-width: 600px) {
       header {
@@ -212,6 +344,10 @@
 
       .stat-row {
         grid-template-columns: 1fr;
+      }
+
+      .mini-stats {
+        grid-template-columns: repeat(2, 1fr);
       }
 
       footer {
