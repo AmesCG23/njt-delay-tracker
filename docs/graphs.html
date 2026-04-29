@@ -634,6 +634,165 @@
     const RULE_COLOR  = '#c0bdb8';
     const BAR_COLOR   = '#2b4c7e';
     const BAR_HOVER   = '#1a3260';
+    const ACCENT      = '#2b4c7e';
+
+    // ============================================================
+    // MOVING AVERAGE (centered, uses available neighbors at edges)
+    // ============================================================
+    function centeredMA(values, half = 1) {
+      return values.map((_, i) => {
+        const lo = Math.max(0, i - half);
+        const hi = Math.min(values.length - 1, i + half);
+        const slice = values.slice(lo, hi + 1);
+        return slice.reduce((s, v) => s + v, 0) / slice.length;
+      });
+    }
+
+    // ============================================================
+    // STATS PANEL
+    // ============================================================
+    function populateStats(data) {
+      const hrs  = data.map(d => d.hours);
+      const avg  = hrs.reduce((s, v) => s + v, 0) / hrs.length;
+      const max  = Math.max(...hrs);
+      const peak = data[hrs.indexOf(max)];
+      const tot  = hrs.reduce((s, v) => s + v, 0);
+
+      document.getElementById('ms-avg').textContent  =
+        avg.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-peak').textContent =
+        max.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-peak-label').textContent =
+        'peak (' + fmtLabel(peak.date) + ')';
+      document.getElementById('ms-total').textContent =
+        tot.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-days').textContent = data.length;
+    }
+
+    // ============================================================
+    // CUSTOM TOOLTIP
+    // ============================================================
+    function makeTooltipHandler(data, avg) {
+      return function({ chart, tooltip }) {
+        const el = document.getElementById('tooltip-hours');
+        if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
+
+        const i  = tooltip.dataPoints[0].dataIndex;
+        const pt = data[i];
+        const pct = avg > 0
+          ? Math.round((pt.hours - avg) / avg * 100)
+          : 0;
+        const vs = pct === 0
+          ? 'at average'
+          : Math.abs(pct) + '% ' + (pct > 0 ? 'above' : 'below') + ' average';
+        const onTime = pt.hours === 0;
+
+        el.innerHTML =
+          '<div class="tt-date">'    + fmtFull(pt.date)                          + '</div>' +
+          '<div class="tt-value">'   + pt.hours.toLocaleString('en-US') + ' person-hours' + '</div>' +
+          '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs)          + '</div>';
+
+        // Position relative to chart-wrap-main
+        const wrap      = document.getElementById('wrap-hours');
+        const canvasOff = chart.canvas.offsetLeft;
+        const TW        = 210;
+        let x = canvasOff + tooltip.caretX + 14;
+        if (x + TW > wrap.clientWidth - 4) x = canvasOff + tooltip.caretX - TW - 14;
+        const y = Math.max(4, tooltip.caretY - 44);
+
+        el.style.left    = x + 'px';
+        el.style.top     = y + 'px';
+        el.style.opacity = '1';
+      };
+    }
+
+    // ============================================================
+    // LINE CHART
+    // ============================================================
+    let hoursChart = null;
+    let showMA     = false;
+
+    function buildChart(data) {
+      const canvas = document.getElementById('chart-hours');
+      const ctx    = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 340);
+      grad.addColorStop(0, 'rgba(43,76,126,0.16)');
+      grad.addColorStop(1, 'rgba(43,76,126,0)');
+
+      const labels = data.map(d => d.label);
+      const values = data.map(d => d.hours);
+      const avg    = values.reduce((s, v) => s + v, 0) / values.length;
+
+      hoursChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Person-hours of delay',
+              data: values,
+              borderColor: ACCENT,
+              backgroundColor: grad,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+              pointBackgroundColor: ACCENT,
+              pointBorderColor: '#f0eeeb',
+              pointBorderWidth: 2,
+              order: 1,
+            },
+            {
+              label: '3-day avg',
+              data: [],            // populated when toggle is on
+              borderColor: 'rgba(43,76,126,0.38)',
+              backgroundColor: 'transparent',
+              fill: false,
+              tension: 0.3,
+              pointRadius: 0,
+              borderDash: [5, 3],
+              order: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.4,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false, external: makeTooltipHandler(data, avg) },
+          },
+          scales: {
+            x: {
+              grid: { color: RULE_COLOR, lineWidth: 0.5 },
+              ticks: {
+                font: { family: FONT, size: 12 },
+                maxRotation: 45,
+                autoSkip: true,
+                maxTicksLimit: 12,
+              },
+            },
+            y: {
+              grid: { color: RULE_COLOR, lineWidth: 0.5 },
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Person-hours',
+                font: { family: FONT, size: 12 },
+                color: '#8a8a8a',
+              },
+              ticks: {
+                font: { family: FONT, size: 12 },
+                callback: v => v.toLocaleString('en-US'),
+              },
+            },
+          },
+        },
+      });
+    }
 
     // ============================================================
     // PLACEHOLDER DATA
