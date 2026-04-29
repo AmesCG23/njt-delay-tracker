@@ -937,6 +937,79 @@
         }
       }
     });
+
+    // ============================================================
+    // CONTROLS: moving average toggle
+    // ============================================================
+    document.getElementById('btn-ma').addEventListener('click', function () {
+      showMA = !showMA;
+      this.classList.toggle('active', showMA);
+      if (hoursChart) {
+        hoursChart.data.datasets[1].data =
+          showMA ? centeredMA(rawData.map(d => d.hours), 1) : [];
+        hoursChart.update();
+      }
+    });
+
+    // ============================================================
+    // CONTROLS: CSV export
+    // ============================================================
+    document.getElementById('btn-csv').addEventListener('click', function () {
+      if (!rawData.length) return;
+      const rows = ['Date,Person-Hours'];
+      rawData.forEach(d => {
+        const iso = d.date.toISOString().slice(0, 10);
+        rows.push(iso + ',' + d.hours);
+      });
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const a    = document.createElement('a');
+      a.href     = URL.createObjectURL(blob);
+      a.download = 'njt-delay-hours.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // ============================================================
+    // CONTROLS: PNG export
+    // ============================================================
+    document.getElementById('btn-png').addEventListener('click', function () {
+      if (!hoursChart) return;
+      const a    = document.createElement('a');
+      a.href     = hoursChart.toBase64Image('image/png', 1);
+      a.download = 'njt-delay-hours.png';
+      a.click();
+    });
+
+    // ============================================================
+    // INIT: fetch data, then render chart and enable controls
+    // ============================================================
+    (async function init() {
+      const status = document.getElementById('status-hours');
+      const canvas = document.getElementById('chart-hours');
+      try {
+        rawData = await loadTweetLog();
+
+        if (rawData.length === 0) {
+          status.textContent = 'No data found in Tweet_log. Check that columns F and G are populated.';
+          return;
+        }
+
+        status.style.display = 'none';
+        canvas.style.display = 'block';
+
+        populateStats(rawData);
+        buildChart(rawData);
+
+        // Enable controls now that data is loaded
+        ['btn-ma', 'btn-csv', 'btn-png'].forEach(id => {
+          document.getElementById(id).disabled = false;
+        });
+      } catch (err) {
+        console.error('Tweet_log fetch failed:', err);
+        status.textContent =
+          'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
+      }
+    })();
   </script>
 
 </body>
