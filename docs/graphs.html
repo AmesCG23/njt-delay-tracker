@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Visualizations — NJT Delay Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --newsprint: #f0eeeb;
+      --ink: #1a1a1a;
+      --ink-light: #4a4a4a;
+      --ink-faint: #8a8a8a;
+      --rule: #c0bdb8;
+      --accent: #2b4c7e;
+    }
+
+    body {
+      font-family: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+      background-color: var(--newsprint);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* === HEADER === */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+    }
+
+    .logo img {
+      height: 64px;
+      width: auto;
+      display: block;
+    }
+
+    .social-icons {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .social-icons a {
+      color: var(--ink-light);
+      text-decoration: none;
+      transition: color 0.2s ease;
+      display: flex;
+      align-items: center;
+    }
+
+    .social-icons a:hover {
+      color: var(--ink);
+    }
+
+    .social-icons svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    /* === MAIN === */
+    main {
+      flex: 1;
+      padding: 2rem 2rem 3rem;
+      max-width: 860px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .proto-banner {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 0.6rem 0.9rem;
+      margin-bottom: 2.5rem;
+      line-height: 1.5;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.3rem;
+    }
+
+    .page-sub {
+      font-size: 1.05rem;
+      color: var(--ink-light);
+      font-style: italic;
+      margin-bottom: 2.5rem;
+    }
+
+    .section-rule {
+      border: none;
+      border-top: 1px solid var(--rule);
+      margin: 2.5rem 0;
+    }
+
+    .chart-section {
+      margin-bottom: 2.5rem;
+    }
+
+    .chart-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+
+    .chart-desc {
+      font-size: 0.9rem;
+      color: var(--ink-light);
+      font-style: italic;
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+
+    .chart-wrap {
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 1.5rem;
+    }
+
+    .chart-wrap canvas {
+      max-height: 320px;
+    }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 1.25rem 1rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      margin-top: 0.3rem;
+      line-height: 1.4;
+    }
+
+    /* === FOOTER === */
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 1.25rem 2rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .footer-text a {
+      color: var(--ink-faint);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      transition: color 0.2s ease;
+    }
+
+    .footer-text a:hover {
+      color: var(--ink-light);
+    }
+
+    /* === FEATURED CHART: mini-stats === */
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .mini-stat {
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 0.75rem 0.6rem;
+      text-align: center;
+    }
+
+    .ms-val {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+
+    .ms-label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      margin-top: 0.25rem;
+      line-height: 1.3;
+    }
+
+    /* === FEATURED CHART: controls === */
+    .chart-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .ctrl-btn {
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 0.82rem;
+      color: var(--ink-light);
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 0.28rem 0.65rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .ctrl-btn:hover {
+      border-color: var(--ink-light);
+      color: var(--ink);
+    }
+
+    .ctrl-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    /* === FEATURED CHART: wrap + canvas === */
+    .chart-wrap-main {
+      position: relative;
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 1.25rem 1rem 1rem;
+      min-height: 260px;
+    }
+
+    /* === CUSTOM TOOLTIP === */
+    .chart-tooltip {
+      position: absolute;
+      background: var(--ink);
+      color: #fff;
+      padding: 0.55rem 0.8rem;
+      border-radius: 2px;
+      font-family: 'EB Garamond', Georgia, serif;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 10;
+      transition: opacity 0.12s;
+      opacity: 0;
+    }
+
+    .tt-date {
+      font-size: 0.72rem;
+      color: #bbb;
+      margin-bottom: 0.15rem;
+    }
+
+    .tt-value {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .tt-compare {
+      font-size: 0.72rem;
+      color: #bbb;
+      font-style: italic;
+      margin-top: 0.1rem;
+    }
+
+    /* === LOADING / ERROR === */
+    .chart-status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 600px) {
+      header {
+        padding: 1rem 1.25rem;
+      }
+
+      main {
+        padding: 1.5rem 1.25rem 2rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .stat-row {
+        grid-template-columns: 1fr;
+      }
+
+      .mini-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      footer {
+        padding: 1rem 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <a href="index.html">
+        <img src="njt-delay-tracker-logo.svg" alt="NJT Delay Tracker">
+      </a>
+    </div>
+
+    <nav class="social-icons">
+      <a href="https://bsky.app/profile/njtdelaytracker.bsky.social" aria-label="Bluesky" title="Follow on Bluesky">
+        <svg viewBox="0 0 600 530" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M135.72 44.03C202.22 93.87 273.72 195.17 300 249.57c26.28-54.4 97.78-155.7 164.28-205.54C528.08-5.57 600-28.93 600 62.33c0 18.14-10.4 152.43-16.5 174.13-21.2 75.37-98.47 94.6-166.87 82.93 119.47 20.4 149.87 87.93 84.2 155.47-124.87 128.53-179.6-32.2-193.57-73.37-2.54-7.5-3.73-11-7.27-11s-4.73 3.5-7.27 11c-13.97 41.17-68.7 201.9-193.57 73.37-65.67-67.54-35.27-135.07 84.2-155.47-68.4 11.67-145.67-7.56-166.87-82.93C10.4 214.76 0 80.47 0 62.33 0-28.93 71.92-5.57 135.72 44.03Z"/>
+        </svg>
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="proto-banner">
+      &#9432;&nbsp; This is a prototype visualization page. Charts use placeholder data until sufficient history accumulates.
+    </div>
+
+    <h1>Data Visualizations</h1>
+    <p class="page-sub">NJ Transit delay costs over time &mdash; by day, line, and rush hour</p>
+
+    <!-- Summary stats -->
+    <div class="stat-row" id="stat-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-daily">$&mdash;</div>
+        <div class="stat-label">Yesterday&rsquo;s delay cost</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-cumulative">$&mdash;</div>
+        <div class="stat-label">Cumulative since April 2026</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-hours">&mdash;</div>
+        <div class="stat-label">Person-hours lost yesterday</div>
+      </div>
+    </div>
+
+    <!-- Featured chart: Hours of delay over time (real data) -->
+    <div class="chart-section">
+      <p class="chart-title">Hours of observed delays, by day</p>
+      <p class="chart-desc">
+        Person-hours of delay per weekday, sourced from NJ Transit service alerts.
+        Weekends are omitted. Hover over any point for details.
+      </p>
+
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-avg">&mdash;</span>
+          <span class="ms-label">avg hrs / day</span>
+        </div>
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-peak">&mdash;</span>
+          <span class="ms-label" id="ms-peak-label">peak day</span>
+        </div>
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-total">&mdash;</span>
+          <span class="ms-label">total person-hrs</span>
+        </div>
+        <div class="mini-stat">
+          <span class="ms-val" id="ms-days">&mdash;</span>
+          <span class="ms-label">days tracked</span>
+        </div>
+      </div>
+
+      <div class="chart-controls">
+        <div class="btn-group">
+          <button class="ctrl-btn" id="btn-ma" disabled title="Toggle 3-day centered moving average">3-day avg</button>
+        </div>
+        <div class="btn-group">
+          <button class="ctrl-btn" id="btn-csv" disabled title="Download underlying data as CSV">&darr; Export CSV</button>
+          <button class="ctrl-btn" id="btn-png" disabled title="Download chart as PNG image">&darr; Export PNG</button>
+        </div>
+      </div>
+
+      <div class="chart-wrap-main" id="wrap-hours">
+        <div class="chart-tooltip" id="tooltip-hours"></div>
+        <div class="chart-status" id="status-hours">Loading delay data&hellip;</div>
+        <canvas id="chart-hours" style="display:none;"></canvas>
+      </div>
+    </div>
+
+    <hr class="section-rule">
+
+    <!-- Chart 1: Daily cost over time -->
+    <div class="chart-section">
+      <p class="chart-title">Daily delay cost</p>
+      <p class="chart-desc">
+        Estimated economic cost per weekday (Mon&ndash;Fri). Each bar represents the total cost
+        of delays across both the morning and evening rush hours. Placeholder data shown.
+      </p>
+      <div class="chart-wrap">
+        <canvas id="chart-daily"></canvas>
+      </div>
+    </div>
+
+    <hr class="section-rule">
+
+    <!-- Chart 2: Cost by line -->
+    <div class="chart-section">
+      <p class="chart-title">Delay cost by rail line</p>
+      <p class="chart-desc">
+        Cumulative economic cost since tracking began, broken down by NJ Transit commuter rail line.
+        Placeholder data shown.
+      </p>
+      <div class="chart-wrap">
+        <canvas id="chart-byline"></canvas>
+      </div>
+    </div>
+
+    <hr class="section-rule">
+
+    <!-- Chart 3: Morning vs evening -->
+    <div class="chart-section">
+      <p class="chart-title">Morning vs. evening rush</p>
+      <p class="chart-desc">
+        Share of total delay cost attributable to the morning rush (5am&ndash;noon ET) versus the
+        evening rush (3pm&ndash;9pm ET). Placeholder data shown.
+      </p>
+      <div class="chart-wrap" style="max-width: 380px; margin: 0 auto;">
+        <canvas id="chart-rush"></canvas>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <p class="footer-text">
+      &larr; <a href="index.html">Back to main page</a>
+      &nbsp;&middot;&nbsp;
+      <a href="methodology.html">Methodology</a>
+    </p>
+    <p class="footer-text" style="margin-top: 0.75rem;">
+      Charts use placeholder data. Real historical data will populate as the tracker accumulates history.
+    </p>
+  </footer>
+
+  <script>
+    // ============================================================
+    // CONFIGURATION — same sheet as index.html
+    // ============================================================
+    const PUBLISHED_ID = '2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce';
+    const SHEET_GID    = '1868128114';
+    // ============================================================
+
+    const csvUrl =
+      `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_ID}` +
+      `/pub?output=csv&gid=${SHEET_GID}`;
+
+    function formatDollars(raw) {
+      const cleaned = String(raw).replace(/["$,\s]/g, '');
+      const num = parseFloat(cleaned);
+      if (isNaN(num)) return '$—';
+      return '$' + Math.round(num).toLocaleString('en-US');
+    }
+
+    function formatInteger(raw) {
+      const cleaned = String(raw).replace(/["$,\s]/g, '');
+      const num = parseFloat(cleaned);
+      if (isNaN(num)) return '—';
+      return Math.round(num).toLocaleString('en-US');
+    }
+
+    fetch(csvUrl)
+      .then(res => { if (!res.ok) throw new Error(res.status); return res.text(); })
+      .then(csv => {
+        const rows = csv.trim().split('\n');
+        document.getElementById('stat-daily').textContent       = formatDollars(rows[0] || '');
+        document.getElementById('stat-cumulative').textContent  = formatDollars(rows[1] || '');
+        document.getElementById('stat-hours').textContent       = formatInteger(rows[2] || '');
+      })
+      .catch(() => {});
+
+    // ============================================================
+    // TWEET_LOG CONFIG
+    // ============================================================
+    const TWEET_LOG_GID = '943972512';
+    const tweetLogUrl =
+      `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_ID}/pub?output=csv&gid=${TWEET_LOG_GID}`;
+
+    // ============================================================
+    // CSV PARSER  (handles quoted fields containing commas/newlines)
+    // ============================================================
+    function parseCSVRow(row) {
+      const cols = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < row.length; i++) {
+        const c = row[i];
+        if (c === '"') {
+          if (inQ && row[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === ',' && !inQ) {
+          cols.push(cur); cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      cols.push(cur);
+      return cols;
+    }
+
+    // ============================================================
+    // DATE UTILITIES
+    // ============================================================
+    function parseDate(str) {
+      str = (str || '').trim().replace(/^["']|["']$/g, '');
+      // ISO 8601  (YYYY-MM-DD)
+      let d = new Date(str.length === 10 ? str + 'T00:00:00' : str);
+      if (!isNaN(d.getTime())) return d;
+      // M/D/YYYY  (Google Sheets US locale default)
+      const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+      return null;
+    }
+
+    function isWeekday(date) {
+      const d = date.getDay();
+      return d !== 0 && d !== 6;
+    }
+
+    // Short axis label: "Mon Apr 21"
+    function fmtLabel(date) {
+      const DD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const MM = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${DD[date.getDay()]} ${MM[date.getMonth()]} ${date.getDate()}`;
+    }
+
+    // Full tooltip label: "Monday, April 21, 2026"
+    function fmtFull(date) {
+      const DD = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const MM = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+      return `${DD[date.getDay()]}, ${MM[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    }
+
+    // ============================================================
+    // DATA FETCH + PARSE
+    // ============================================================
+    let rawData = [];   // [{ date, hours, label }]  sorted ascending
+
+    async function loadTweetLog() {
+      const res = await fetch(tweetLogUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+
+      const points = [];
+      for (let i = 1; i < lines.length; i++) {   // row 0 is header
+        const cols = parseCSVRow(lines[i]);
+        if (cols.length < 7) continue;
+
+        const date  = parseDate(cols[5]);          // column F
+        if (!date || !isWeekday(date)) continue;
+
+        const hours = parseFloat((cols[6] || '').replace(/[,$"\s]/g, ''));
+        if (isNaN(hours)) continue;
+
+        points.push({ date, hours, label: fmtLabel(date) });
+      }
+
+      points.sort((a, b) => a.date - b.date);
+      return points;
+    }
+
+    // ============================================================
+    // CHART DEFAULTS
+    // ============================================================
+    const FONT = "'EB Garamond', Georgia, serif";
+    Chart.defaults.font.family = FONT;
+    Chart.defaults.color = '#4a4a4a';
+
+    const RULE_COLOR  = '#c0bdb8';
+    const BAR_COLOR   = '#2b4c7e';
+    const BAR_HOVER   = '#1a3260';
+    const ACCENT      = '#2b4c7e';
+
+    // ============================================================
+    // MOVING AVERAGE (centered, uses available neighbors at edges)
+    // ============================================================
+    function centeredMA(values, half = 1) {
+      return values.map((_, i) => {
+        const lo = Math.max(0, i - half);
+        const hi = Math.min(values.length - 1, i + half);
+        const slice = values.slice(lo, hi + 1);
+        return slice.reduce((s, v) => s + v, 0) / slice.length;
+      });
+    }
+
+    // ============================================================
+    // STATS PANEL
+    // ============================================================
+    function populateStats(data) {
+      const hrs  = data.map(d => d.hours);
+      const avg  = hrs.reduce((s, v) => s + v, 0) / hrs.length;
+      const max  = Math.max(...hrs);
+      const peak = data[hrs.indexOf(max)];
+      const tot  = hrs.reduce((s, v) => s + v, 0);
+
+      document.getElementById('ms-avg').textContent  =
+        avg.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-peak').textContent =
+        max.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-peak-label').textContent =
+        'peak (' + fmtLabel(peak.date) + ')';
+      document.getElementById('ms-total').textContent =
+        tot.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-days').textContent = data.length;
+    }
+
+    // ============================================================
+    // CUSTOM TOOLTIP
+    // ============================================================
+    function makeTooltipHandler(data, avg) {
+      return function({ chart, tooltip }) {
+        const el = document.getElementById('tooltip-hours');
+        if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
+
+        const i  = tooltip.dataPoints[0].dataIndex;
+        const pt = data[i];
+        const pct = avg > 0
+          ? Math.round((pt.hours - avg) / avg * 100)
+          : 0;
+        const vs = pct === 0
+          ? 'at average'
+          : Math.abs(pct) + '% ' + (pct > 0 ? 'above' : 'below') + ' average';
+        const onTime = pt.hours === 0;
+
+        el.innerHTML =
+          '<div class="tt-date">'    + fmtFull(pt.date)                          + '</div>' +
+          '<div class="tt-value">'   + pt.hours.toLocaleString('en-US') + ' person-hours' + '</div>' +
+          '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs)          + '</div>';
+
+        // Position relative to chart-wrap-main
+        const wrap      = document.getElementById('wrap-hours');
+        const canvasOff = chart.canvas.offsetLeft;
+        const TW        = 210;
+        let x = canvasOff + tooltip.caretX + 14;
+        if (x + TW > wrap.clientWidth - 4) x = canvasOff + tooltip.caretX - TW - 14;
+        const y = Math.max(4, tooltip.caretY - 44);
+
+        el.style.left    = x + 'px';
+        el.style.top     = y + 'px';
+        el.style.opacity = '1';
+      };
+    }
+
+    // ============================================================
+    // LINE CHART
+    // ============================================================
+    let hoursChart = null;
+    let showMA     = false;
+
+    function buildChart(data) {
+      const canvas = document.getElementById('chart-hours');
+      const ctx    = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 340);
+      grad.addColorStop(0, 'rgba(43,76,126,0.16)');
+      grad.addColorStop(1, 'rgba(43,76,126,0)');
+
+      const labels = data.map(d => d.label);
+      const values = data.map(d => d.hours);
+      const avg    = values.reduce((s, v) => s + v, 0) / values.length;
+
+      hoursChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Person-hours of delay',
+              data: values,
+              borderColor: ACCENT,
+              backgroundColor: grad,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+              pointBackgroundColor: ACCENT,
+              pointBorderColor: '#f0eeeb',
+              pointBorderWidth: 2,
+              order: 1,
+            },
+            {
+              label: '3-day avg',
+              data: [],            // populated when toggle is on
+              borderColor: 'rgba(43,76,126,0.38)',
+              backgroundColor: 'transparent',
+              fill: false,
+              tension: 0.3,
+              pointRadius: 0,
+              borderDash: [5, 3],
+              order: 0,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.4,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false, external: makeTooltipHandler(data, avg) },
+          },
+          scales: {
+            x: {
+              grid: { color: RULE_COLOR, lineWidth: 0.5 },
+              ticks: {
+                font: { family: FONT, size: 12 },
+                maxRotation: 45,
+                autoSkip: true,
+                maxTicksLimit: 12,
+              },
+            },
+            y: {
+              grid: { color: RULE_COLOR, lineWidth: 0.5 },
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Person-hours',
+                font: { family: FONT, size: 12 },
+                color: '#8a8a8a',
+              },
+              ticks: {
+                font: { family: FONT, size: 12 },
+                callback: v => v.toLocaleString('en-US'),
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // ============================================================
+    // PLACEHOLDER DATA
+    // Data below is illustrative only. Replace with real fetched
+    // data once the Event Log or Tweet_log tab is published.
+    // ============================================================
+
+    const placeholderDates = [
+      'Apr 21','Apr 22','Apr 23','Apr 24','Apr 25',
+      'Apr 28','Apr 29'
+    ];
+
+    const placeholderDailyCosts = [
+      742040, 318500, 512000, 0, 1105000,
+      427800, 615000
+    ];
+
+    const lineLabels = [
+      'Northeast Corridor',
+      'Morris & Essex',
+      'North Jersey Coast',
+      'Main/Bergen County',
+      'Raritan Valley',
+      'Montclair-Boonton',
+      'System-Wide'
+    ];
+
+    const lineCosts = [480000, 310000, 195000, 145000, 92000, 78000, 442040];
+
+    // ============================================================
+    // CHART 1: Daily cost bar chart
+    // ============================================================
+    new Chart(document.getElementById('chart-daily'), {
+      type: 'bar',
+      data: {
+        labels: placeholderDates,
+        datasets: [{
+          label: 'Delay cost',
+          data: placeholderDailyCosts,
+          backgroundColor: BAR_COLOR,
+          hoverBackgroundColor: BAR_HOVER,
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => '$' + ctx.parsed.y.toLocaleString('en-US')
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: RULE_COLOR, lineWidth: 0.5 },
+            ticks: { font: { family: FONT, size: 13 } }
+          },
+          y: {
+            grid: { color: RULE_COLOR, lineWidth: 0.5 },
+            ticks: {
+              font: { family: FONT, size: 13 },
+              callback: val => '$' + (val / 1000).toFixed(0) + 'k'
+            },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    // ============================================================
+    // CHART 2: Cost by line (horizontal bar)
+    // ============================================================
+    new Chart(document.getElementById('chart-byline'), {
+      type: 'bar',
+      data: {
+        labels: lineLabels,
+        datasets: [{
+          label: 'Cumulative cost',
+          data: lineCosts,
+          backgroundColor: BAR_COLOR,
+          hoverBackgroundColor: BAR_HOVER,
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => '$' + ctx.parsed.x.toLocaleString('en-US')
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: RULE_COLOR, lineWidth: 0.5 },
+            ticks: {
+              font: { family: FONT, size: 13 },
+              callback: val => '$' + (val / 1000).toFixed(0) + 'k'
+            },
+            beginAtZero: true
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { family: FONT, size: 13 } }
+          }
+        }
+      }
+    });
+
+    // ============================================================
+    // CHART 3: Morning vs evening doughnut
+    // ============================================================
+    new Chart(document.getElementById('chart-rush'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Morning rush', 'Evening rush'],
+        datasets: [{
+          data: [58, 42],
+          backgroundColor: ['#2b4c7e', '#8fa8c8'],
+          hoverOffset: 8,
+          borderColor: '#f0eeeb',
+          borderWidth: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { family: FONT, size: 14 }, padding: 16 }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.label + ': ' + ctx.parsed + '%'
+            }
+          }
+        }
+      }
+    });
+
+    // ============================================================
+    // CONTROLS: moving average toggle
+    // ============================================================
+    document.getElementById('btn-ma').addEventListener('click', function () {
+      showMA = !showMA;
+      this.classList.toggle('active', showMA);
+      if (hoursChart) {
+        hoursChart.data.datasets[1].data =
+          showMA ? centeredMA(rawData.map(d => d.hours), 1) : [];
+        hoursChart.update();
+      }
+    });
+
+    // ============================================================
+    // CONTROLS: CSV export
+    // ============================================================
+    document.getElementById('btn-csv').addEventListener('click', function () {
+      if (!rawData.length) return;
+      const rows = ['Date,Person-Hours'];
+      rawData.forEach(d => {
+        const iso = d.date.toISOString().slice(0, 10);
+        rows.push(iso + ',' + d.hours);
+      });
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const a    = document.createElement('a');
+      a.href     = URL.createObjectURL(blob);
+      a.download = 'njt-delay-hours.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    // ============================================================
+    // CONTROLS: PNG export
+    // ============================================================
+    document.getElementById('btn-png').addEventListener('click', function () {
+      if (!hoursChart) return;
+      const a    = document.createElement('a');
+      a.href     = hoursChart.toBase64Image('image/png', 1);
+      a.download = 'njt-delay-hours.png';
+      a.click();
+    });
+
+    // ============================================================
+    // INIT: fetch data, then render chart and enable controls
+    // ============================================================
+    (async function init() {
+      const status = document.getElementById('status-hours');
+      const canvas = document.getElementById('chart-hours');
+      try {
+        rawData = await loadTweetLog();
+
+        if (rawData.length === 0) {
+          status.textContent = 'No data found in Tweet_log. Check that columns F and G are populated.';
+          return;
+        }
+
+        status.style.display = 'none';
+        canvas.style.display = 'block';
+
+        populateStats(rawData);
+        buildChart(rawData);
+
+        // Enable controls now that data is loaded
+        ['btn-ma', 'btn-csv', 'btn-png'].forEach(id => {
+          document.getElementById(id).disabled = false;
+        });
+      } catch (err) {
+        console.error('Tweet_log fetch failed:', err);
+        status.textContent =
+          'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
+      }
+    })();
+  </script>
+
+</body>
+</html>
