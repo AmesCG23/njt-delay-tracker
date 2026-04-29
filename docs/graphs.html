@@ -534,6 +534,97 @@
       .catch(() => {});
 
     // ============================================================
+    // TWEET_LOG CONFIG
+    // ============================================================
+    const TWEET_LOG_GID = '943972512';
+    const tweetLogUrl =
+      `https://docs.google.com/spreadsheets/d/e/${PUBLISHED_ID}/pub?output=csv&gid=${TWEET_LOG_GID}`;
+
+    // ============================================================
+    // CSV PARSER  (handles quoted fields containing commas/newlines)
+    // ============================================================
+    function parseCSVRow(row) {
+      const cols = [];
+      let cur = '', inQ = false;
+      for (let i = 0; i < row.length; i++) {
+        const c = row[i];
+        if (c === '"') {
+          if (inQ && row[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === ',' && !inQ) {
+          cols.push(cur); cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      cols.push(cur);
+      return cols;
+    }
+
+    // ============================================================
+    // DATE UTILITIES
+    // ============================================================
+    function parseDate(str) {
+      str = (str || '').trim().replace(/^["']|["']$/g, '');
+      // ISO 8601  (YYYY-MM-DD)
+      let d = new Date(str.length === 10 ? str + 'T00:00:00' : str);
+      if (!isNaN(d.getTime())) return d;
+      // M/D/YYYY  (Google Sheets US locale default)
+      const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+      return null;
+    }
+
+    function isWeekday(date) {
+      const d = date.getDay();
+      return d !== 0 && d !== 6;
+    }
+
+    // Short axis label: "Mon Apr 21"
+    function fmtLabel(date) {
+      const DD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const MM = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${DD[date.getDay()]} ${MM[date.getMonth()]} ${date.getDate()}`;
+    }
+
+    // Full tooltip label: "Monday, April 21, 2026"
+    function fmtFull(date) {
+      const DD = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const MM = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+      return `${DD[date.getDay()]}, ${MM[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    }
+
+    // ============================================================
+    // DATA FETCH + PARSE
+    // ============================================================
+    let rawData = [];   // [{ date, hours, label }]  sorted ascending
+
+    async function loadTweetLog() {
+      const res = await fetch(tweetLogUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+
+      const points = [];
+      for (let i = 1; i < lines.length; i++) {   // row 0 is header
+        const cols = parseCSVRow(lines[i]);
+        if (cols.length < 7) continue;
+
+        const date  = parseDate(cols[5]);          // column F
+        if (!date || !isWeekday(date)) continue;
+
+        const hours = parseFloat((cols[6] || '').replace(/[,$"\s]/g, ''));
+        if (isNaN(hours)) continue;
+
+        points.push({ date, hours, label: fmtLabel(date) });
+      }
+
+      points.sort((a, b) => a.date - b.date);
+      return points;
+    }
+
+    // ============================================================
     // CHART DEFAULTS
     // ============================================================
     const FONT = "'EB Garamond', Georgia, serif";
