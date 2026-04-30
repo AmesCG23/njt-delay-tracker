@@ -376,7 +376,7 @@
 
   <main>
     <div class="proto-banner">
-      &#9432;&nbsp; This is a prototype visualization page. Charts use placeholder data until sufficient history accumulates.
+      &#9432;&nbsp; This is a prototype visualization page. The line chart and rush-hour split use live data. The cost-by-line chart is illustrative.
     </div>
 
     <h1>Data Visualizations</h1>
@@ -444,26 +444,12 @@
 
     <hr class="section-rule">
 
-    <!-- Chart 1: Daily cost over time -->
-    <div class="chart-section">
-      <p class="chart-title">Daily delay cost</p>
-      <p class="chart-desc">
-        Estimated economic cost per weekday (Mon&ndash;Fri). Each bar represents the total cost
-        of delays across both the morning and evening rush hours. Placeholder data shown.
-      </p>
-      <div class="chart-wrap">
-        <canvas id="chart-daily"></canvas>
-      </div>
-    </div>
-
-    <hr class="section-rule">
-
     <!-- Chart 2: Cost by line -->
     <div class="chart-section">
       <p class="chart-title">Delay cost by rail line</p>
       <p class="chart-desc">
         Cumulative economic cost since tracking began, broken down by NJ Transit commuter rail line.
-        Placeholder data shown.
+        Illustrative — will be updated as per-line data accumulates.
       </p>
       <div class="chart-wrap">
         <canvas id="chart-byline"></canvas>
@@ -476,8 +462,8 @@
     <div class="chart-section">
       <p class="chart-title">Morning vs. evening rush</p>
       <p class="chart-desc">
-        Share of total delay cost attributable to the morning rush (5am&ndash;noon ET) versus the
-        evening rush (3pm&ndash;9pm ET). Placeholder data shown.
+        Share of total delay cost attributable to the morning rush (5&ndash;10:30am ET) versus the
+        evening rush (3&ndash;8:30pm ET), based on cumulative totals since tracking began.
       </p>
       <div class="chart-wrap" style="max-width: 380px; margin: 0 auto;">
         <canvas id="chart-rush"></canvas>
@@ -493,7 +479,7 @@
       <a href="methodology.html">Methodology</a>
     </p>
     <p class="footer-text" style="margin-top: 0.75rem;">
-      Charts use placeholder data. Real historical data will populate as the tracker accumulates history.
+      Cost-by-line chart is illustrative and will be updated as per-line history accumulates.
     </p>
   </footer>
 
@@ -530,8 +516,13 @@
         document.getElementById('stat-daily').textContent       = formatDollars(rows[0] || '');
         document.getElementById('stat-cumulative').textContent  = formatDollars(rows[1] || '');
         document.getElementById('stat-hours').textContent       = formatInteger(rows[2] || '');
+
+        // A6 = morning cumulative, A7 = evening cumulative (rows index 5 and 6)
+        const morning = parseFloat((rows[5] || '').replace(/[,$"\s]/g, '')) || 0;
+        const evening = parseFloat((rows[6] || '').replace(/[,$"\s]/g, '')) || 0;
+        buildRushDoughnut(morning, evening);
       })
-      .catch(() => {});
+      .catch(() => { buildRushDoughnut(0, 0); });
 
     // ============================================================
     // TWEET_LOG CONFIG
@@ -795,21 +786,8 @@
     }
 
     // ============================================================
-    // PLACEHOLDER DATA
-    // Data below is illustrative only. Replace with real fetched
-    // data once the Event Log or Tweet_log tab is published.
+    // ILLUSTRATIVE DATA — cost by line (to be replaced with real data)
     // ============================================================
-
-    const placeholderDates = [
-      'Apr 21','Apr 22','Apr 23','Apr 24','Apr 25',
-      'Apr 28','Apr 29'
-    ];
-
-    const placeholderDailyCosts = [
-      742040, 318500, 512000, 0, 1105000,
-      427800, 615000
-    ];
-
     const lineLabels = [
       'Northeast Corridor',
       'Morris & Essex',
@@ -823,49 +801,7 @@
     const lineCosts = [480000, 310000, 195000, 145000, 92000, 78000, 442040];
 
     // ============================================================
-    // CHART 1: Daily cost bar chart
-    // ============================================================
-    new Chart(document.getElementById('chart-daily'), {
-      type: 'bar',
-      data: {
-        labels: placeholderDates,
-        datasets: [{
-          label: 'Delay cost',
-          data: placeholderDailyCosts,
-          backgroundColor: BAR_COLOR,
-          hoverBackgroundColor: BAR_HOVER,
-          borderRadius: 2,
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => '$' + ctx.parsed.y.toLocaleString('en-US')
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: { color: RULE_COLOR, lineWidth: 0.5 },
-            ticks: { font: { family: FONT, size: 13 } }
-          },
-          y: {
-            grid: { color: RULE_COLOR, lineWidth: 0.5 },
-            ticks: {
-              font: { family: FONT, size: 13 },
-              callback: val => '$' + (val / 1000).toFixed(0) + 'k'
-            },
-            beginAtZero: true
-          }
-        }
-      }
-    });
-
-    // ============================================================
-    // CHART 2: Cost by line (horizontal bar)
+    // CHART: Cost by line (horizontal bar — illustrative)
     // ============================================================
     new Chart(document.getElementById('chart-byline'), {
       type: 'bar',
@@ -908,35 +844,44 @@
     });
 
     // ============================================================
-    // CHART 3: Morning vs evening doughnut
+    // CHART: Morning vs evening doughnut (live data from for_web A6/A7)
     // ============================================================
-    new Chart(document.getElementById('chart-rush'), {
-      type: 'doughnut',
-      data: {
-        labels: ['Morning rush', 'Evening rush'],
-        datasets: [{
-          data: [58, 42],
-          backgroundColor: ['#2b4c7e', '#8fa8c8'],
-          hoverOffset: 8,
-          borderColor: '#f0eeeb',
-          borderWidth: 3,
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { family: FONT, size: 14 }, padding: 16 }
-          },
-          tooltip: {
-            callbacks: {
-              label: ctx => ctx.label + ': ' + ctx.parsed + '%'
+    function buildRushDoughnut(morning, evening) {
+      const total = morning + evening;
+      const noData = total === 0;
+
+      new Chart(document.getElementById('chart-rush'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Morning rush (5–10:30am ET)', 'Evening rush (3–8:30pm ET)'],
+          datasets: [{
+            data: noData ? [1, 1] : [morning, evening],
+            backgroundColor: ['#2b4c7e', '#8fa8c8'],
+            hoverOffset: 8,
+            borderColor: '#f0eeeb',
+            borderWidth: 3,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { font: { family: FONT, size: 14 }, padding: 16 }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  if (noData) return ctx.label + ': no data yet';
+                  const pct = Math.round(ctx.parsed / total * 100);
+                  return ctx.label + ': ' + pct + '% (' + formatDollars(ctx.parsed.toString()) + ')';
+                }
+              }
             }
           }
         }
-      }
-    });
+      });
+    }
 
     // ============================================================
     // CONTROLS: moving average toggle
