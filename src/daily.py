@@ -280,6 +280,7 @@ def compute_line_hours(events):
         "Main/Bergen County": 0.0,
         "Raritan Valley":     0.0,
         "Montclair-Boonton":  0.0,
+        "Pascack Valley":     0.0,
         "_system_wide":       0.0,
     }
     for ev in events:
@@ -470,6 +471,7 @@ def run():
                 rv_hours=line_hours["Raritan Valley"],
                 mobo_hours=line_hours["Montclair-Boonton"],
                 syswide_hours=line_hours["_system_wide"],
+                pvl_hours=line_hours["Pascack Valley"],
             )
         except Exception as e:
             print(f"[DAILY] Tweet_log write failed: {e}")
