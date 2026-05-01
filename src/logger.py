@@ -175,15 +175,26 @@ TWEET_LOG_TAB = "Tweet_log"
 
 
 def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
-              morning_cost=0, evening_cost=0):
+              morning_cost=0, evening_cost=0, report_date=None,
+              nec_hours=0, me_hours=0, njcl_hours=0,
+              mb_hours=0, rv_hours=0, mobo_hours=0, syswide_hours=0):
     """
     Append the daily summary tweet to the Tweet_log tab.
     Creates the tab and headers automatically if they don't exist.
 
     Columns A–E: Timestamp | Tweet Text | Total Cost Estimate | Number of Delay Events | Post URI
-    Columns F–H: reserved for manual/formula use (Date, Person-Hours, etc.)
+    Column F:    Report Date (YYYY-MM-DD — the date of delays being reported, i.e. yesterday)
+    Column G:    Person-Hours (total person-hours lost; drives the line graph on graphs.html)
+    Column H:    reserved
     Column I:    Morning Cost (post-dedup dollar total for morning window)
     Column J:    Evening Cost (post-dedup dollar total for evening window)
+    Column K:    NEC person-hours
+    Column L:    Morris & Essex person-hours
+    Column M:    NJCL person-hours
+    Column N:    Main/Bergen County person-hours
+    Column O:    Raritan Valley person-hours
+    Column P:    Montclair-Boonton person-hours
+    Column Q:    System-wide (Penn Station) person-hours
     """
     sheet_id = os.environ.get("GOOGLE_SHEET_ID")
     if not sheet_id:
@@ -193,29 +204,39 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
         client = get_sheet_client()
         spreadsheet = client.open_by_key(sheet_id)
 
-        # Get or create Tweet_log tab
+        # Get or create Tweet_log tab (17 cols to cover A–Q)
         try:
             tweet_tab = spreadsheet.worksheet(TWEET_LOG_TAB)
         except gspread.WorksheetNotFound:
-            tweet_tab = spreadsheet.add_worksheet(TWEET_LOG_TAB, rows=500, cols=10)
+            tweet_tab = spreadsheet.add_worksheet(TWEET_LOG_TAB, rows=500, cols=17)
 
-        # Write column I/J headers if not already present
+        # Write column headers for I–Q if not already present
         existing_i = tweet_tab.acell("I1").value
         if existing_i != "Morning Cost":
-            tweet_tab.update("I1", [["Morning Cost", "Evening Cost"]])
+            tweet_tab.update("I1", [[
+                "Morning Cost", "Evening Cost",
+                "NEC Hours", "M&E Hours", "NJCL Hours",
+                "Main/Bergen Hours", "Raritan Hours", "MoBo Hours", "Syswide Hours",
+            ]])
 
-        # Append the row — F/G/H left empty (user-managed columns)
         row = [
             datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S"),  # A: Timestamp
             text,                                               # B: Tweet Text
             f"${total_cost:,.2f}",                             # C: Total Cost Estimate
             event_count,                                        # D: Number of Delay Events
             uri or "",                                          # E: Post URI
-            "",                                                 # F: (user-managed)
-            "",                                                 # G: (user-managed)
+            report_date or "",                                  # F: Report Date (yesterday)
+            round(person_hours) if person_hours else "",        # G: Person-Hours (for line graph)
             "",                                                 # H: (reserved)
             round(morning_cost),                               # I: Morning Cost
             round(evening_cost),                               # J: Evening Cost
+            round(nec_hours),                                  # K: NEC person-hours
+            round(me_hours),                                   # L: Morris & Essex person-hours
+            round(njcl_hours),                                 # M: NJCL person-hours
+            round(mb_hours),                                   # N: Main/Bergen County person-hours
+            round(rv_hours),                                   # O: Raritan Valley person-hours
+            round(mobo_hours),                                 # P: Montclair-Boonton person-hours
+            round(syswide_hours),                              # Q: System-wide (Penn Station) person-hours
         ]
         tweet_tab.append_row(row, value_input_option="USER_ENTERED")
         print(f"[LOGGER] Tweet logged to {TWEET_LOG_TAB} tab "
