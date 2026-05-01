@@ -433,6 +433,7 @@ def run():
                 person_hours=totals["total_person_hours"],
                 morning_cost=morning_totals["total_cost"],
                 evening_cost=evening_totals["total_cost"],
+                report_date=yesterday_et.isoformat(),
             )
         except Exception as e:
             print(f"[DAILY] Tweet_log write failed: {e}")

@@ -175,13 +175,15 @@ TWEET_LOG_TAB = "Tweet_log"
 
 
 def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
-              morning_cost=0, evening_cost=0):
+              morning_cost=0, evening_cost=0, report_date=None):
     """
     Append the daily summary tweet to the Tweet_log tab.
     Creates the tab and headers automatically if they don't exist.
 
     Columns A–E: Timestamp | Tweet Text | Total Cost Estimate | Number of Delay Events | Post URI
-    Columns F–H: reserved for manual/formula use (Date, Person-Hours, etc.)
+    Column F:    Report Date (YYYY-MM-DD — the date of delays being reported, i.e. yesterday)
+    Column G:    Person-Hours (total person-hours lost; drives the line graph on graphs.html)
+    Column H:    reserved
     Column I:    Morning Cost (post-dedup dollar total for morning window)
     Column J:    Evening Cost (post-dedup dollar total for evening window)
     """
@@ -204,15 +206,14 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
         if existing_i != "Morning Cost":
             tweet_tab.update("I1", [["Morning Cost", "Evening Cost"]])
 
-        # Append the row — F/G/H left empty (user-managed columns)
         row = [
             datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S"),  # A: Timestamp
             text,                                               # B: Tweet Text
             f"${total_cost:,.2f}",                             # C: Total Cost Estimate
             event_count,                                        # D: Number of Delay Events
             uri or "",                                          # E: Post URI
-            "",                                                 # F: (user-managed)
-            "",                                                 # G: (user-managed)
+            report_date or "",                                  # F: Report Date (yesterday)
+            round(person_hours) if person_hours else "",        # G: Person-Hours (for line graph)
             "",                                                 # H: (reserved)
             round(morning_cost),                               # I: Morning Cost
             round(evening_cost),                               # J: Evening Cost
