@@ -376,7 +376,7 @@
 
   <main>
     <div class="proto-banner">
-      &#9432;&nbsp; This is a prototype visualization page. The line chart and rush-hour split use live data. The cost-by-line chart is illustrative.
+      &#9432;&nbsp; This is a prototype visualization page. All three charts use live data from the tracking log.
     </div>
 
     <h1>Data Visualizations</h1>
@@ -444,12 +444,12 @@
 
     <hr class="section-rule">
 
-    <!-- Chart 2: Cost by line -->
+    <!-- Chart 2: Person-hours by line -->
     <div class="chart-section">
-      <p class="chart-title">Delay cost by rail line</p>
+      <p class="chart-title">Delay hours by rail line</p>
       <p class="chart-desc">
-        Cumulative economic cost since tracking began, broken down by NJ Transit commuter rail line.
-        Illustrative — will be updated as per-line data accumulates.
+        Cumulative person-hours of delay since tracking began, broken down by NJ Transit commuter
+        rail line. System-wide Penn Station alerts are shown separately since they affect all lines.
       </p>
       <div class="chart-wrap">
         <canvas id="chart-byline"></canvas>
@@ -479,7 +479,7 @@
       <a href="methodology.html">Methodology</a>
     </p>
     <p class="footer-text" style="margin-top: 0.75rem;">
-      Cost-by-line chart is illustrative and will be updated as per-line history accumulates.
+      Person-hours = riders &times; delay duration. System-wide Penn Station throughput estimated at 8,000 riders/hr.
     </p>
   </footer>
 
@@ -598,21 +598,30 @@
       const lines = text.trim().split('\n');
 
       const points = [];
+      // lineHours[0-6] = cumulative person-hours for K–Q (NEC, M&E, NJCL, MB, RV, MoBo, Syswide)
+      const lineHours = [0, 0, 0, 0, 0, 0, 0];
+
       for (let i = 1; i < lines.length; i++) {   // row 0 is header
         const cols = parseCSVRow(lines[i]);
         if (cols.length < 7) continue;
 
-        const date  = parseDate(cols[5]);          // column F
+        const date  = parseDate(cols[5]);          // column F: report date
         if (!date || !isWeekday(date)) continue;
 
         const hours = parseFloat((cols[6] || '').replace(/[,$"\s]/g, ''));
         if (isNaN(hours)) continue;
 
         points.push({ date, hours, label: fmtLabel(date) });
+
+        // Accumulate per-line hours from columns K–Q (0-indexed 10–16)
+        for (let j = 0; j < 7; j++) {
+          const val = parseFloat((cols[10 + j] || '').replace(/[,$"\s]/g, ''));
+          if (!isNaN(val)) lineHours[j] += val;
+        }
       }
 
       points.sort((a, b) => a.date - b.date);
-      return points;
+      return { points, lineHours };
     }
 
     // ============================================================
@@ -786,62 +795,59 @@
     }
 
     // ============================================================
-    // ILLUSTRATIVE DATA — cost by line (to be replaced with real data)
+    // CHART: Person-hours by line (horizontal bar — live data from K–Q)
     // ============================================================
-    const lineLabels = [
+    const LINE_LABELS = [
       'Northeast Corridor',
       'Morris & Essex',
       'North Jersey Coast',
       'Main/Bergen County',
       'Raritan Valley',
       'Montclair-Boonton',
-      'System-Wide'
+      'System-Wide (Penn)'
     ];
 
-    const lineCosts = [480000, 310000, 195000, 145000, 92000, 78000, 442040];
-
-    // ============================================================
-    // CHART: Cost by line (horizontal bar — illustrative)
-    // ============================================================
-    new Chart(document.getElementById('chart-byline'), {
-      type: 'bar',
-      data: {
-        labels: lineLabels,
-        datasets: [{
-          label: 'Cumulative cost',
-          data: lineCosts,
-          backgroundColor: BAR_COLOR,
-          hoverBackgroundColor: BAR_HOVER,
-          borderRadius: 2,
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => '$' + ctx.parsed.x.toLocaleString('en-US')
+    function buildLineBar(lineHours) {
+      new Chart(document.getElementById('chart-byline'), {
+        type: 'bar',
+        data: {
+          labels: LINE_LABELS,
+          datasets: [{
+            label: 'Cumulative person-hours',
+            data: lineHours,
+            backgroundColor: BAR_COLOR,
+            hoverBackgroundColor: BAR_HOVER,
+            borderRadius: 2,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.parsed.x.toLocaleString('en-US') + ' person-hrs'
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: RULE_COLOR, lineWidth: 0.5 },
+              ticks: {
+                font: { family: FONT, size: 13 },
+                callback: val => val.toLocaleString('en-US')
+              },
+              beginAtZero: true
+            },
+            y: {
+              grid: { display: false },
+              ticks: { font: { family: FONT, size: 13 } }
             }
           }
-        },
-        scales: {
-          x: {
-            grid: { color: RULE_COLOR, lineWidth: 0.5 },
-            ticks: {
-              font: { family: FONT, size: 13 },
-              callback: val => '$' + (val / 1000).toFixed(0) + 'k'
-            },
-            beginAtZero: true
-          },
-          y: {
-            grid: { display: false },
-            ticks: { font: { family: FONT, size: 13 } }
-          }
         }
-      }
-    });
+      });
+    }
 
     // ============================================================
     // CHART: Morning vs evening doughnut (live data from for_web A6/A7)
@@ -926,19 +932,23 @@
     });
 
     // ============================================================
-    // INIT: fetch data, then render chart and enable controls
+    // INIT: fetch data, then render all charts and enable controls
     // ============================================================
     (async function init() {
       const status = document.getElementById('status-hours');
       const canvas = document.getElementById('chart-hours');
       try {
-        rawData = await loadTweetLog();
+        const { points, lineHours } = await loadTweetLog();
 
-        if (rawData.length === 0) {
+        // Bar chart uses live data regardless of whether the line chart has points
+        buildLineBar(lineHours);
+
+        if (points.length === 0) {
           status.textContent = 'No data found in Tweet_log. Check that columns F and G are populated.';
           return;
         }
 
+        rawData = points;
         status.style.display = 'none';
         canvas.style.display = 'block';
 
@@ -953,6 +963,7 @@
         console.error('Tweet_log fetch failed:', err);
         status.textContent =
           'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
+        buildLineBar([0, 0, 0, 0, 0, 0, 0]);
       }
     })();
   </script>

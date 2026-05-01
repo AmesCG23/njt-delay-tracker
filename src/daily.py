@@ -265,6 +265,34 @@ def process_window(label, start_utc, end_utc):
 
 # ── Tweet formatting ──────────────────────────────────────────────────────────
 
+def compute_line_hours(events):
+    """
+    Sum person-hours by line for the per-line columns in Tweet_log (K–Q).
+
+    System-wide Penn Station events (system_wide=True, not line_suspension)
+    are bucketed under "_system_wide" rather than any specific line.
+    Line suspensions are attributed to their named line like normal events.
+    """
+    totals = {
+        "Northeast Corridor": 0.0,
+        "Morris & Essex":     0.0,
+        "North Jersey Coast": 0.0,
+        "Main/Bergen County": 0.0,
+        "Raritan Valley":     0.0,
+        "Montclair-Boonton":  0.0,
+        "_system_wide":       0.0,
+    }
+    for ev in events:
+        line = ev.get("line", "")
+        is_penn_syswide = ev.get("system_wide", False) and not ev.get("line_suspension", False)
+        hrs = (ev.get("estimated_riders") or 0) * (ev.get("delay_minutes") or 0) / 60
+        if is_penn_syswide:
+            totals["_system_wide"] += hrs
+        elif line in totals:
+            totals[line] += hrs
+    return totals
+
+
 def format_tweet(yesterday_et, totals):
     """
     Format the daily summary tweet.
@@ -425,6 +453,7 @@ def run():
 
         # Log tweet to Tweet_log tab
         try:
+            line_hours = compute_line_hours(all_events)
             log_tweet(
                 text=tweet_text,
                 total_cost=totals["total_cost"],
@@ -434,6 +463,13 @@ def run():
                 morning_cost=morning_totals["total_cost"],
                 evening_cost=evening_totals["total_cost"],
                 report_date=yesterday_et.isoformat(),
+                nec_hours=line_hours["Northeast Corridor"],
+                me_hours=line_hours["Morris & Essex"],
+                njcl_hours=line_hours["North Jersey Coast"],
+                mb_hours=line_hours["Main/Bergen County"],
+                rv_hours=line_hours["Raritan Valley"],
+                mobo_hours=line_hours["Montclair-Boonton"],
+                syswide_hours=line_hours["_system_wide"],
             )
         except Exception as e:
             print(f"[DAILY] Tweet_log write failed: {e}")
