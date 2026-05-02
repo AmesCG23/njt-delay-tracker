@@ -29,6 +29,7 @@ ALERT_ACCOUNTS = [
     ("njtransit-me.bsky.social", "Morris & Essex"),
     ("njtransit-mobo.bsky.social", "Montclair-Boonton"),
     ("njtransit-mbpj.bsky.social", "Main/Bergen County"),
+    ("njtransit-pvl.bsky.social", "Pascack Valley"),        # PVL double-coverage
 ]
 
 # Posts to fetch per API call (100 is the Bluesky API max per request).
