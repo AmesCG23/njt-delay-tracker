@@ -586,10 +586,9 @@
       const lines = text.trim().split('\n');
 
       const points = [];
-      // lineHours[0-6]  = cumulative person-hours for K–Q (NEC, M&E, NJCL, MB, RV, MoBo, Syswide)
-      // lineHours[7]    = Pascack Valley (column R, index 17)
-      // lineHours[8-10] = Port Jervis, Atlantic City Rail, Gladstone Branch (not in tweet_log → 0)
-      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      // lineHours[0-6] = cumulative person-hours for K–Q (NEC, M&E, NJCL, MB, RV, MoBo, Syswide)
+      // lineHours[7]   = Pascack Valley (column R, index 17)
+      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0];
 
       for (let i = 1; i < lines.length; i++) {   // row 0 is header
         const cols = parseCSVRow(lines[i]);
@@ -799,9 +798,6 @@
       'Montclair-Boonton',
       'System-Wide (Penn)',
       'Pascack Valley',
-      'Port Jervis',
-      'Atlantic City Rail',
-      'Gladstone Branch',
     ];
 
     function buildLineBar(lineHours) {
@@ -967,7 +963,7 @@
         console.error('Tweet_log fetch failed:', err);
         status.textContent =
           'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
-        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0]);
       }
     })();
   </script>
