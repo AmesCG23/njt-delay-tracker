@@ -436,9 +436,10 @@
       <p class="chart-desc">
         Cumulative person-hours of delay since tracking began, broken down by NJ Transit commuter
         rail line. System-wide Penn Station alerts are shown separately since they affect all lines.
+        <span id="byline-days-note"></span>
       </p>
       <div class="chart-wrap">
-        <canvas id="chart-byline"></canvas>
+        <canvas id="chart-byline" style="max-height: 400px;"></canvas>
       </div>
     </div>
 
@@ -450,6 +451,7 @@
       <p class="chart-desc">
         Share of total delay cost attributable to the morning rush (5&ndash;10:30am ET) versus the
         evening rush (3&ndash;8:30pm ET), based on cumulative totals since tracking began.
+        <span id="rush-days-note"></span>
       </p>
       <div class="chart-wrap" style="max-width: 380px; margin: 0 auto;">
         <canvas id="chart-rush"></canvas>
@@ -584,8 +586,10 @@
       const lines = text.trim().split('\n');
 
       const points = [];
-      // lineHours[0-6] = cumulative person-hours for K–Q (NEC, M&E, NJCL, MB, RV, MoBo, Syswide)
-      const lineHours = [0, 0, 0, 0, 0, 0, 0];
+      // lineHours[0-6]  = cumulative person-hours for K–Q (NEC, M&E, NJCL, MB, RV, MoBo, Syswide)
+      // lineHours[7]    = Pascack Valley (column R, index 17)
+      // lineHours[8-10] = Port Jervis, Atlantic City Rail, Gladstone Branch (not in tweet_log → 0)
+      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
       for (let i = 1; i < lines.length; i++) {   // row 0 is header
         const cols = parseCSVRow(lines[i]);
@@ -604,6 +608,9 @@
           const val = parseFloat((cols[10 + j] || '').replace(/[,$"\s]/g, ''));
           if (!isNaN(val)) lineHours[j] += val;
         }
+        // Pascack Valley is in column R (0-indexed 17)
+        const pvl = parseFloat((cols[17] || '').replace(/[,$"\s]/g, ''));
+        if (!isNaN(pvl)) lineHours[7] += pvl;
       }
 
       points.sort((a, b) => a.date - b.date);
@@ -790,7 +797,11 @@
       'Main/Bergen County',
       'Raritan Valley',
       'Montclair-Boonton',
-      'System-Wide (Penn)'
+      'System-Wide (Penn)',
+      'Pascack Valley',
+      'Port Jervis',
+      'Atlantic City Rail',
+      'Gladstone Branch',
     ];
 
     function buildLineBar(lineHours) {
@@ -929,6 +940,13 @@
         // Bar chart uses live data regardless of whether the line chart has points
         buildLineBar(lineHours);
 
+        if (points.length > 0) {
+          const n = points.length;
+          const dayNote = `Based on ${n} weekday${n === 1 ? '' : 's'} of data.`;
+          document.getElementById('byline-days-note').textContent = dayNote;
+          document.getElementById('rush-days-note').textContent = dayNote;
+        }
+
         if (points.length === 0) {
           status.textContent = 'No data found in Tweet_log. Check that columns F and G are populated.';
           return;
@@ -949,7 +967,7 @@
         console.error('Tweet_log fetch failed:', err);
         status.textContent =
           'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
-        buildLineBar([0, 0, 0, 0, 0, 0, 0]);
+        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       }
     })();
   </script>
