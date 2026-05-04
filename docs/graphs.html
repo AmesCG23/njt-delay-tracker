@@ -587,8 +587,7 @@
 
       const points = [];
       // lineHours[0-7]  = K–R columns (NEC, M&E, NJCL, MB, RV, MoBo, Syswide, PVL)
-      // lineHours[8-10] = Port Jervis, Gladstone Branch, Atlantic City Rail (always 0 — no sheet columns)
-      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0];
       let bylineDays = 0;   // rows with any K–R cell populated
       let rushDays   = 0;   // rows with I or J populated
 
@@ -804,8 +803,6 @@
 
     // ============================================================
     // CHART: Person-hours by line (horizontal bar — live data from K–Q)
-    // Port Jervis, Gladstone Branch, and Atlantic City Rail have no
-    // dedicated spreadsheet columns; they will always render as 0.
     // ============================================================
     const LINE_LABELS = [
       'Northeast Corridor',
@@ -816,9 +813,6 @@
       'Montclair-Boonton',
       'System-Wide (Penn)',
       'Pascack Valley',
-      'Port Jervis',
-      'Gladstone Branch',
-      'Atlantic City Rail',
     ];
 
     function buildLineBar(lineHours) {
@@ -986,7 +980,7 @@
         console.error('Tweet_log fetch failed:', err);
         status.textContent =
           'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
-        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0]);
       }
     })();
   </script>
