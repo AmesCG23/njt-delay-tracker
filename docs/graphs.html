@@ -714,6 +714,53 @@
     }
 
     // ============================================================
+    // PENDING IMPLEMENTATION: METHODOLOGY CHANGE MARKERS
+    // Not yet deployed — waiting for Ames to confirm a date.
+    // When ready, follow these three steps exactly:
+    //
+    // STEP 1 — In <head>, add this line AFTER the Chart.js script tag:
+    //   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    //
+    // STEP 2 — In the CONFIGURATION block at the top of this script,
+    //   add this array (fill in the real date and label):
+    //   const METHODOLOGY_CHANGES = [
+    //     { date: 'YYYY-MM-DD', label: 'Methodology v2' },
+    //   ];
+    //
+    // STEP 3 — Inside buildChart(), in the `plugins:` block of the
+    //   Chart options, ADD this as a third entry alongside legend and tooltip:
+    //
+    //     annotation: {
+    //       annotations: METHODOLOGY_CHANGES.reduce((acc, change, i) => {
+    //         const pt = data.find(d => d.date.toISOString().slice(0, 10) === change.date);
+    //         if (!pt) return acc;
+    //         acc['method' + i] = {
+    //           type: 'line',
+    //           xMin: pt.label,
+    //           xMax: pt.label,
+    //           borderColor: 'rgba(180, 40, 40, 0.8)',
+    //           borderWidth: 2,
+    //           borderDash: [5, 3],
+    //           label: {
+    //             display: true,
+    //             content: change.label,
+    //             position: 'start',
+    //             backgroundColor: 'rgba(180, 40, 40, 0.85)',
+    //             color: '#fff',
+    //             font: { family: FONT, size: 11 },
+    //             padding: { x: 6, y: 3 },
+    //           },
+    //         };
+    //         return acc;
+    //       }, {}),
+    //     },
+    //
+    // The line will be anchored to the date string label on the x-axis,
+    // so it moves correctly as the chart scales. Add more objects to
+    // METHODOLOGY_CHANGES for additional markers.
+    // ============================================================
+
+    // ============================================================
     // LINE CHART
     // ============================================================
     let hoursChart = null;
