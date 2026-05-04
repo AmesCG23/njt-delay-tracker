@@ -20,16 +20,16 @@ One post goes out daily at ~3pm ET (targeting 5pm ET actual after GitHub delay),
 One workflow (`daily.yml`) fires once per weekday (Tue–Sat, covering Mon–Fri delays). No staging files, no caching, no collect/summarize split. Bluesky stores all posts permanently so we always reach back and fetch what we need.
 
 ```
-GitHub Actions fires at 19:00 UTC Tue–Sat (~5pm ET actual after ~2h delay)
+GitHub Actions fires at 20:00 UTC Tue–Sat (~4–5pm ET actual after ~2h delay)
        |
        v
 daily.py
   |
   ├── get_yesterday_windows()
-  |     Calculates yesterday's morning and evening UTC windows.
+  |     Calculates yesterday's morning and evening ET windows.
   |     "Yesterday" in ET time = fully complete by the time we run.
-  |     Morning: 09:00–16:00 UTC (5am–noon EDT)
-  |     Evening: 19:00–01:00 UTC (3pm–9pm EDT, crosses midnight)
+  |     Morning: 5:00–10:30 AM ET (09:00–14:30 UTC EDT)
+  |     Evening: 3:00–8:30 PM ET  (19:00–00:30 UTC EDT, crosses UTC midnight)
   |
   ├── process_window("morning")  ← runs twice, independently
   ├── process_window("evening")
@@ -173,9 +173,12 @@ MOBO → Montclair-Boonton, M&E → Morris & Essex, MBPJ → Main/Bergen County,
 ### Post format
 ```
 On [Day], NJ Transit delayed commuters for a total of [PERSON-HOURS]
-across both rush hours. City employers lost [COST] in productive
-working time. ([N] delay events across [N] lines)
+across the morning and afternoon rush hours. City employers lost out on
+working time conservatively valued at [COST]. (Estimate based on [N] delay events)
 ```
+Person-hours vs person-minutes: hours used if total ≥ 60,000 person-minutes, otherwise minutes.
+Cost formatted as $X.XM if ≥ $1M, otherwise $X,XXX.
+
 No delays:
 ```
 Good news! Yesterday ([Day]), NJ Transit commuter rail ran on time
@@ -190,15 +193,17 @@ with no significant delays reported. 🚂
 |---|---|
 | `njmetroalert.bsky.social` | All lines — primary |
 | `njtransit--nec.bsky.social` | NEC — double coverage (note double dash) |
+| `njtransit-njcl.bsky.social` | North Jersey Coast — double coverage |
 | `njtransit-me.bsky.social` | Morris & Essex |
 | `njtransit-mobo.bsky.social` | Montclair-Boonton |
 | `njtransit-mbpj.bsky.social` | Main/Bergen County |
+| `njtransit-pvl.bsky.social` | Pascack Valley — double coverage |
 
 ---
 
 ## Google Sheet Structure
 
-**Single file, five tabs.**
+**Single file, six tabs.**
 
 ### Tab 1: Event Log (Python writes — batched)
 One row per deduplicated delay event. Written once per window via `log_delay_batch()`.
@@ -210,8 +215,19 @@ Note: "Posted to Bluesky" always "No" — individual events never posted. Legacy
 - B2: `=SUM('Event Log'!I:I)` — running cumulative total
 
 ### Tab 3: Tweet_log (auto-created)
-One row per daily tweet sent.
-Columns: Timestamp, Tweet Text, Total Cost Estimate, Number of Delay Events, Post URI
+One row per daily tweet sent. 18 columns A–R.
+- A: Timestamp
+- B: Tweet Text
+- C: Total Cost Estimate
+- D: Number of Delay Events
+- E: Post URI
+- F: Report Date (YYYY-MM-DD — the date of delays, i.e. yesterday)
+- G: Person-Hours (total; drives the line graph on graphs.html)
+- H: (reserved)
+- I: Morning Cost (post-dedup dollar total)
+- J: Evening Cost (post-dedup dollar total)
+- K–Q: Per-line person-hours (NEC, M&E, NJCL, Main/Bergen, Raritan, MoBo, System-wide Penn)
+- R: Pascack Valley person-hours
 
 ### Tab 4: Alert Log (wiped and rewritten each run)
 Pre-dedup audit trail for hand-checking. One row per interpreted alert before
@@ -224,10 +240,11 @@ One row per window (morning + evening). Quick sanity check on overall numbers.
 Columns: Run Date, Period, Raw Posts Fetched, After Dedup, Total Cost,
 Date of Post, Time of Post, Post URI
 
-### Tab 6: for_web (manual — publish to web)
+### Tab 6: for_web (publish to web)
 Feeds the public website via Google Visualization API CSV endpoint.
-- A1: yesterday's total cost (number, e.g. 742040)
-- A2: cumulative total since launch (number)
+- A1: yesterday's total cost — written automatically by `logger.py` each run
+- A2: cumulative total since launch — enter manually or use a formula
+- A3: yesterday's person-hours — written automatically by `logger.py` each run
 Must be published: File → Share → Publish to web
 
 ---
@@ -239,10 +256,12 @@ Must be published: File → Share → Publish to web
 ├── CLAUDE.md
 ├── README.md
 ├── requirements.txt
-├── CNAME                        ← custom domain for GitHub Pages
+├── next_steps.md                ← checklist for getting the website live
+├── data/                        ← local data files (not committed to git)
 ├── .github/
 │   └── workflows/
-│       └── daily.yml            ← one workflow, Tue–Sat, 19:00 UTC
+│       ├── daily.yml            ← main pipeline, Tue–Sat, 20:00 UTC
+│       └── benchmark.yml        ← manual dry-run replay against a past date
 ├── src/
 │   ├── daily.py                 ← main orchestrator
 │   ├── watcher.py               ← Bluesky fetcher + alert type detection
@@ -250,8 +269,12 @@ Must be published: File → Share → Publish to web
 │   ├── calculator.py            ← cost math (3 calculation types)
 │   ├── logger.py                ← Sheets writer (all tabs)
 │   └── aggregator.py            ← dedup, totals, post formatter
-└── website/
-    └── index.html               ← static site (design complete)
+└── docs/                        ← GitHub Pages root (served at custom domain)
+    ├── index.html               ← main public page
+    ├── graphs.html              ← data visualization page
+    ├── methodology.html         ← methodology explainer
+    ├── CNAME                    ← custom domain for GitHub Pages
+    └── njt-delay-tracker-logo.svg
 ```
 
 Retired files (delete from repo if present):
@@ -264,8 +287,12 @@ Retired files (delete from repo if present):
 
 ```yaml
 # daily.yml — Tue–Sat so Tuesday covers Monday, Saturday covers Friday
-- cron: "0 19 * * 2-6"   # 19:00 UTC → ~5pm ET actual after ~2h delay
+- cron: "0 20 * * 2-6"   # 20:00 UTC = 3pm EST / 4pm EDT → ~4–5pm ET actual after ~2h delay
 ```
+
+Two workflows total:
+- `daily.yml` — automated daily run (no `DRY_RUN` on schedule; `DRY_RUN=true` default for manual triggers)
+- `benchmark.yml` — manual only; always `DRY_RUN=true`; accepts `OVERRIDE_DATE` to replay any past date
 
 ~10 minutes/month — well within GitHub's 2,000 free tier.
 
@@ -292,7 +319,8 @@ All Sheets writes are batched to avoid 429 quota errors on bad NJT days:
 
 | Runtime var | Values | Notes |
 |---|---|---|
-| `DRY_RUN` | `true` / `false` | Skips all Sheets writes and tweet. Default `true` for manual triggers. |
+| `DRY_RUN` | `true` / `false` | Skips all Sheets writes and tweet. Default `true` for manual triggers, `false` for scheduled runs. |
+| `OVERRIDE_DATE` | `YYYY-MM-DD` | If set, treats this date as "yesterday" instead of computing from current time. Used by `benchmark.yml`. |
 
 ---
 
@@ -323,6 +351,14 @@ tuple. Fixed: all return paths return a 2-tuple including early-exit cases.
 `raw_count` variable was referenced in the return statement but never assigned
 in the happy path. Fixed: `raw_count = len(raw)` added after fetch.
 
+### Interpreter null + resolution language false resurrection
+When the Haiku interpreter returned null, the code fell back to watcher-extracted
+data — which could resurrect a "service restored" alert as a new delay event.
+Fixed: check raw text for resolution phrases ("on or close to schedule", "service
+restored", "normal service", etc.) before applying the watcher fallback. Null +
+resolution language → drop the event. Null + no resolution language + known line
+and delay → use watcher fallback.
+
 ---
 
 ## Hand-Check Protocol
@@ -345,13 +381,17 @@ Common sources of legitimate slippage:
 
 ## Website
 
-- Static site (`index.html`) — complete, newsprint gray (#f0eeeb) + EB Garamond
-- Data pulled from `for_web` tab via Google Visualization API CSV endpoint
-- Hosting: GitHub Pages with custom domain (GoDaddy)
-- DNS: 4 A records → GitHub IPs, CNAME `www` → `yourusername.github.io`
-- `CNAME` file in repo root with domain name
-- SPREADSHEET_ID and email still need to be filled in index.html
-- `for_web` tab needs to be created manually and published to web
+Three pages, all in `docs/`:
+- `index.html` — main public page (newsprint gray #f0eeeb + EB Garamond)
+- `graphs.html` — data visualizations (daily hours chart, by-line bar, morning/evening doughnut)
+- `methodology.html` — methodology explainer
+
+Data sources:
+- `for_web` tab → Google Visualization API CSV endpoint → `index.html` summary stats
+- `Tweet_log` tab → same endpoint → `graphs.html` charts (columns F, G, I–R)
+
+Hosting: GitHub Pages, `docs/` folder on `main` branch, custom domain via GoDaddy.
+`docs/CNAME` contains the domain name.
 
 **GitHub Pages DNS records:**
 ```
@@ -360,6 +400,10 @@ Common sources of legitimate slippage:
 185.199.110.153
 185.199.111.153
 ```
+
+**graphs.html pending feature:** Methodology change date markers (red vertical lines
+on the hours chart). Implementation is commented out inside `graphs.html` with
+step-by-step instructions. Activate when Ames confirms a methodology change date.
 
 ---
 
@@ -413,4 +457,4 @@ Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 ---
 
-*Last updated: April 19, 2026. Built collaboratively with Claude (Anthropic).*
+*Last updated: May 4, 2026. Built collaboratively with Claude (Anthropic).*
