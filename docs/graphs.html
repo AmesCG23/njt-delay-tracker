@@ -604,23 +604,25 @@
 
         points.push({ date, hours, label: fmtLabel(date) });
 
-        // Count days with morning/evening data in I (8) and J (9)
-        if ([8, 9].some(idx => (cols[idx] || '').replace(/[,$"\s]/g, '') !== '')) {
+        // Count days with non-zero morning/evening data in I (8) and J (9).
+        // Logger writes 0 on no-delay days, so check > 0, not just non-empty.
+        if ([8, 9].some(idx => {
+          const v = parseFloat((cols[idx] || '').replace(/[,$"\s]/g, ''));
+          return !isNaN(v) && v > 0;
+        })) {
           rushDays++;
         }
 
         // Accumulate per-line hours from columns K–Q (0-indexed 10–16)
         let hasKR = false;
         for (let j = 0; j < 7; j++) {
-          const raw = (cols[10 + j] || '').replace(/[,$"\s]/g, '');
-          if (raw !== '') hasKR = true;
-          const val = parseFloat(raw);
+          const val = parseFloat((cols[10 + j] || '').replace(/[,$"\s]/g, ''));
+          if (!isNaN(val) && val > 0) hasKR = true;
           if (!isNaN(val)) lineHours[j] += val;
         }
         // Pascack Valley is in column R (0-indexed 17)
-        const pvlRaw = (cols[17] || '').replace(/[,$"\s]/g, '');
-        if (pvlRaw !== '') hasKR = true;
-        const pvl = parseFloat(pvlRaw);
+        const pvl = parseFloat((cols[17] || '').replace(/[,$"\s]/g, ''));
+        if (!isNaN(pvl) && pvl > 0) hasKR = true;
         if (!isNaN(pvl)) lineHours[7] += pvl;
 
         if (hasKR) bylineDays++;
