@@ -586,9 +586,11 @@
       const lines = text.trim().split('\n');
 
       const points = [];
-      // lineHours[0-6] = cumulative person-hours for K–Q (NEC, M&E, NJCL, MB, RV, MoBo, Syswide)
-      // lineHours[7]   = Pascack Valley (column R, index 17)
-      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0];
+      // lineHours[0-7]  = K–R columns (NEC, M&E, NJCL, MB, RV, MoBo, Syswide, PVL)
+      // lineHours[8-10] = Port Jervis, Gladstone Branch, Atlantic City Rail (always 0 — no sheet columns)
+      const lineHours = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      let bylineDays = 0;   // rows with any K–R cell populated
+      let rushDays   = 0;   // rows with I or J populated
 
       for (let i = 1; i < lines.length; i++) {   // row 0 is header
         const cols = parseCSVRow(lines[i]);
@@ -602,18 +604,30 @@
 
         points.push({ date, hours, label: fmtLabel(date) });
 
+        // Count days with morning/evening data in I (8) and J (9)
+        if ([8, 9].some(idx => (cols[idx] || '').replace(/[,$"\s]/g, '') !== '')) {
+          rushDays++;
+        }
+
         // Accumulate per-line hours from columns K–Q (0-indexed 10–16)
+        let hasKR = false;
         for (let j = 0; j < 7; j++) {
-          const val = parseFloat((cols[10 + j] || '').replace(/[,$"\s]/g, ''));
+          const raw = (cols[10 + j] || '').replace(/[,$"\s]/g, '');
+          if (raw !== '') hasKR = true;
+          const val = parseFloat(raw);
           if (!isNaN(val)) lineHours[j] += val;
         }
         // Pascack Valley is in column R (0-indexed 17)
-        const pvl = parseFloat((cols[17] || '').replace(/[,$"\s]/g, ''));
+        const pvlRaw = (cols[17] || '').replace(/[,$"\s]/g, '');
+        if (pvlRaw !== '') hasKR = true;
+        const pvl = parseFloat(pvlRaw);
         if (!isNaN(pvl)) lineHours[7] += pvl;
+
+        if (hasKR) bylineDays++;
       }
 
       points.sort((a, b) => a.date - b.date);
-      return { points, lineHours };
+      return { points, lineHours, bylineDays, rushDays };
     }
 
     // ============================================================
@@ -788,6 +802,8 @@
 
     // ============================================================
     // CHART: Person-hours by line (horizontal bar — live data from K–Q)
+    // Port Jervis, Gladstone Branch, and Atlantic City Rail have no
+    // dedicated spreadsheet columns; they will always render as 0.
     // ============================================================
     const LINE_LABELS = [
       'Northeast Corridor',
@@ -798,6 +814,9 @@
       'Montclair-Boonton',
       'System-Wide (Penn)',
       'Pascack Valley',
+      'Port Jervis',
+      'Gladstone Branch',
+      'Atlantic City Rail',
     ];
 
     function buildLineBar(lineHours) {
@@ -931,16 +950,18 @@
       const status = document.getElementById('status-hours');
       const canvas = document.getElementById('chart-hours');
       try {
-        const { points, lineHours } = await loadTweetLog();
+        const { points, lineHours, bylineDays, rushDays } = await loadTweetLog();
 
         // Bar chart uses live data regardless of whether the line chart has points
         buildLineBar(lineHours);
 
-        if (points.length > 0) {
-          const n = points.length;
-          const dayNote = `Based on ${n} weekday${n === 1 ? '' : 's'} of data.`;
-          document.getElementById('byline-days-note').textContent = dayNote;
-          document.getElementById('rush-days-note').textContent = dayNote;
+        if (bylineDays > 0) {
+          document.getElementById('byline-days-note').textContent =
+            `Based on ${bylineDays} weekday${bylineDays === 1 ? '' : 's'} of data.`;
+        }
+        if (rushDays > 0) {
+          document.getElementById('rush-days-note').textContent =
+            `Based on ${rushDays} weekday${rushDays === 1 ? '' : 's'} of data.`;
         }
 
         if (points.length === 0) {
@@ -963,7 +984,7 @@
         console.error('Tweet_log fetch failed:', err);
         status.textContent =
           'Could not load delay data. Make sure the Tweet_log tab is published to the web.';
-        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0]);
+        buildLineBar([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       }
     })();
   </script>
