@@ -139,11 +139,9 @@ if __name__ == "__main__":
 
 
 # ── System-wide Penn Station throughput ───────────────────────────────────────
-# ~40,000 inbound passengers during the 5-hour morning rush = 8,000/hr.
-# Same figure used for evening outbound (comparable volume).
-# Assumption: system-wide alerts last 1 hour unless text says otherwise.
-# Disclosed in methodology as an estimated upper-bound figure.
-PENN_STATION_RIDERS_PER_HOUR = 8000
+# RPA figure: ~65,000 daily departures from Penn to NJ. Assuming equal inbound
+# volume and 60% of total trips during peak hours → 9,600 passengers/hr.
+PENN_STATION_RIDERS_PER_HOUR = 9600
 SYSTEM_WIDE_ASSUMED_DURATION_MINUTES = 60
 
 
