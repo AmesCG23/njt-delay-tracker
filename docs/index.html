@@ -173,7 +173,7 @@
       color: var(--ink-faint);
       line-height: 1.5;
       max-width: 600px;
-      margin: 1.5rem auto 0;
+      margin: 0 auto;
     }
 
     .footer-kofi a {
@@ -191,7 +191,13 @@
       display: flex;
       justify-content: center;
       gap: 2rem;
-      margin-bottom: 1.5rem;
+    }
+
+    footer hr {
+      border: none;
+      border-top: 1px solid var(--rule);
+      max-width: 600px;
+      margin: 1rem auto;
     }
 
     .footer-nav a {
@@ -270,7 +276,7 @@
 
   <main>
     <div class="hero-block">
-      <p class="hero-lede">Every day NJ Transit runs late, and every day New Jersey commuters and New York City employers absorb the cost. <em>Here&rsquo;s how much.</em></p>
+      <p class="hero-lede">Every day New Jersey Transit runs late, and every day New Jersey commuters and New York City employers absorb the cost. <em>Here&rsquo;s how much.</em></p>
 
       <p class="figure-label" id="figure-label-daily">Yesterday, New Jersey Transit delays cost commuters and New York City employers more than:</p>
       <p class="figure-primary" id="figure-daily">$&mdash;</p>
@@ -284,7 +290,7 @@
         Every Tuesday through Saturday, we collect New Jersey Transit service alerts and estimate
         the economic cost of those delays, using a methodology that draws on NJT ridership and
         New Jersey economic data. These figures are estimates, not an official accounting &mdash;
-        but the delays and their effects are very real, in the form of time-sensitive emails that go unsent in
+        but the delays and their effects are very real, in the form of emails that go unsent while stalled in
         the Hudson tunnels, documents you can&rsquo;t reach while on a crowded train, and daycare late
         fees that keep piling up.
       </p>
@@ -301,16 +307,18 @@
       <a href="graphs.html">Data and Trends</a>
       <a href="#">Contact Us</a>
     </nav>
+    <hr>
     <p class="footer-text">
       NJT / Delay Tracker is a project of BetterTrains.org, a nonprofit that doesn't exist yet.
-      For now it's the work of one person, writing anonymously. Call me Appius Claudius. No doxxing, please.
+      For now, this tracker is the work of one person, writing anonymously. No doxxing, please.
     </p>
-    <p class="footer-text" style="margin-top: 0.4rem;">
+    <p class="footer-text" style="margin-top: 0.6rem;">
       This site is not affiliated with New Jersey Transit in any way.
     </p>
+    <hr>
     <p class="footer-kofi">
       Running this site costs money, to say nothing of my very limited spare time. If you find this project useful, please consider <a href="https://ko-fi.com/bettertrains" target="_blank" rel="noopener">buying me a coffee</a> to keep it running.
-    </p>   
+    </p>
   </footer>
 
   <script>
