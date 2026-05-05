@@ -861,11 +861,26 @@
       'Pascack Valley',
     ];
 
+    const LINE_LABELS_MOBILE = [
+      'NEC',
+      'M&E',
+      'Coast Line',
+      'Main/Bergen',
+      'Raritan',
+      'Montclair',
+      'Penn Station',
+      'Pascack',
+    ];
+
     function buildLineBar(lineHours) {
+      const isMobile = window.innerWidth <= 600;
+      const labels = isMobile ? LINE_LABELS_MOBILE : LINE_LABELS;
+      const tickSize = isMobile ? 11 : 13;
+
       new Chart(document.getElementById('chart-byline'), {
         type: 'bar',
         data: {
-          labels: LINE_LABELS,
+          labels,
           datasets: [{
             label: 'Cumulative person-hours',
             data: lineHours,
@@ -881,7 +896,8 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: ctx => ctx.parsed.x.toLocaleString('en-US') + ' person-hrs'
+                label: ctx => ctx.parsed.x.toLocaleString('en-US') + ' person-hrs',
+                title: ctx => LINE_LABELS[ctx[0].dataIndex],
               }
             }
           },
@@ -889,14 +905,14 @@
             x: {
               grid: { color: RULE_COLOR, lineWidth: 0.5 },
               ticks: {
-                font: { family: FONT, size: 13 },
+                font: { family: FONT, size: tickSize },
                 callback: val => val.toLocaleString('en-US')
               },
               beginAtZero: true
             },
             y: {
               grid: { display: false },
-              ticks: { font: { family: FONT, size: 13 } }
+              ticks: { font: { family: FONT, size: tickSize } }
             }
           }
         }
