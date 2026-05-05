@@ -1,6 +1,5 @@
 This tracker's methodology remains a work in progress. We hope to refine it by obtaining better data through OPRA requests. Until then, here is how the system works.
 
----
 
 ## Scraper
 
@@ -10,7 +9,6 @@ The scraper looks for delays between 5:00 AM and 10:30 AM for the morning rush, 
 
 One feature of New Jersey commuting is the dreaded notification regarding "all traffic to and from Penn Station." We treat Penn delays as their own "line," taking the longest reported delay and matching with estimated *hourly* trips through Penn Station, calculated below.
 
----
 
 ## Ridership
 
@@ -26,7 +24,7 @@ With that in mind, last, we treat the LIRR peak-hour percentage as a lower bound
 
 To arrive at our per-rush-hour train ridership figures, we divide our new by-line estimates of daily peak commuters by the sum of morning and evening rush trains. Those were calculated from GTFS data using Claude Code and then checked by hand. We then round up to the nearest 50.
 
-Last, we use an hourly estimate of Penn Station ridership to calculate the impact of systemwide delays — like the dreaded Portal Bridge failure. We start with the Regional Plan Association's figure of roughly 65,000 people departing from Penn Station for New Jersey every day. Assuming an equal number coming *into* Penn from New Jersey, and 60 percent of those total trips during peak hours, gives a figure of 9,600 passengers per hour.
+Last, we use an hourly estimate of Penn Station ridership to calculate the impact of systemwide delays — like the dreaded Portal Bridge failure. We start with the Regional Plan Association's [figure](https://rpa.org/work/reports/the-value-of-nj-transit_) of roughly 65,000 people departing from Penn Station for New Jersey every day. Assuming an equal number coming *into* Penn from New Jersey, and 60 percent of those total trips during peak hours, gives a figure of 9,600 passengers per hour.
 
 Results are presented below. We're always interested in improving this process. Please get in touch with any ideas. No need to recommend an OPRA request for peak ridership data; we're already on it.
 
@@ -41,7 +39,6 @@ Results are presented below. We're always interested in improving this process. 
 | Pascack Valley | 1,325 | 100 |
 | NY Penn Station (systemwide) | — | 9,600, modeled hourly |
 
----
 
 ## Costs
 
@@ -53,7 +50,6 @@ Thankfully, there's a robust literature in transit policy on how to "value" time
 
 We think this is a fair estimate — even a generous one. If you doubt us, try to send a particularly important email while holding your backpack on your lap *and* jammed into the middle seat of a 75-year-old train car. Then try it again standing for an hour.
 
----
 
 ## Changelog
 
