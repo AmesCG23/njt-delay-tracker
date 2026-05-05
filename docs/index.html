@@ -173,7 +173,7 @@
       color: var(--ink-faint);
       line-height: 1.5;
       max-width: 600px;
-      margin: 1rem auto 0;
+      margin: 0 auto;
     }
 
     .footer-kofi a {
@@ -191,7 +191,13 @@
       display: flex;
       justify-content: center;
       gap: 2rem;
-      margin-bottom: 1.25rem;
+    }
+
+    footer hr {
+      border: none;
+      border-top: 1px solid var(--rule);
+      max-width: 600px;
+      margin: 1rem auto;
     }
 
     .footer-nav a {
@@ -301,10 +307,12 @@
       <a href="graphs.html">Data and Trends</a>
       <a href="#">Contact Us</a>
     </nav>
+    <hr>
     <p class="footer-text">
       NJT / Delay Tracker is a project of BetterTrains.org, a nonprofit that doesn't exist yet (but I have the domain just in case).
       It's an independent public accountability project and not affiliated with New Jersey Transit in any way, shape, or form.
     </p>
+    <hr>
     <p class="footer-kofi">
       This is an independent project, planned and launched by one person with limited coding experience. Costs include web hosting, Claude, and the Claude API&mdash;in addition to my very limited spare time. If you find this project useful, please consider <a href="https://ko-fi.com/bettertrains" target="_blank" rel="noopener">buying me a coffee</a> to keep it running.
     </p>
