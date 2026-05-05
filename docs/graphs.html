@@ -187,6 +187,26 @@
       color: var(--ink-light);
     }
 
+    .footer-nav {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .footer-nav a {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .footer-nav a:hover {
+      color: var(--ink-light);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
     /* === FEATURED CHART: mini-stats === */
     .mini-stats {
       display: grid;
@@ -462,14 +482,11 @@
   </main>
 
   <footer>
-    <p class="footer-text">
-      &larr; <a href="index.html">Back to main page</a>
-      &nbsp;&middot;&nbsp;
+    <nav class="footer-nav">
       <a href="methodology.html">Methodology</a>
-    </p>
-    <p class="footer-text" style="margin-top: 0.75rem;">
-      Person-hours = riders &times; delay duration. System-wide Penn Station throughput estimated at 8,000 riders/hr.
-    </p>
+      <a href="graphs.html">Data and Trends</a>
+      <a href="#">Contact Us</a>
+    </nav>
   </footer>
 
   <script>

@@ -223,6 +223,26 @@
       color: var(--ink-light);
     }
 
+    .footer-nav {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .footer-nav a {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .footer-nav a:hover {
+      color: var(--ink-light);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
     /* === RESPONSIVE === */
     @media (max-width: 600px) {
       header {
@@ -269,9 +289,11 @@
   </main>
 
   <footer>
-    <p class="footer-text">
-      &larr; <a href="index.html">Back to the main page</a>
-    </p>
+    <nav class="footer-nav">
+      <a href="methodology.html">Methodology</a>
+      <a href="graphs.html">Data and Trends</a>
+      <a href="#">Contact Us</a>
+    </nav>
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
