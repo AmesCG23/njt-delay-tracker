@@ -16,25 +16,24 @@ Design decisions:
 """
 
 # ── Value of Travel Time ──────────────────────────────────────────────────────
-# USDOT methodology applied to NJ median household income ($99,781, 2023 Census ACS)
-# $99,781 ÷ 2,080 work hours = $47.97/hr × 50% = $23.99/hr → rounded to $24.00
-VTTS_RATE = 24.00  # dollars per hour
+# Regional earnings: ~$138k NJ metro area median income → ~$66/hr gross
+# Value of Travel Time = 2/3 of hourly earnings = $44.00/hr
+VTTS_RATE = 44.00  # dollars per hour
 
 # National USDOT default (disclosed in methodology for transparency)
 VTTS_NATIONAL_DEFAULT = 18.80
 
 # ── Riders per train (peak figures used for all events) ───────────────────────
-# Built from: 62M annual rail riders (2025), per-line train frequency data,
-# and RPA anchor data (63,014 daily Penn Station boardings).
+# Built from OPRA ridership data and GTFS train frequency, checked by hand.
 # Peak figures used exclusively since all polling occurs during rush windows.
 RIDERS_PER_TRAIN = {
-    "Northeast Corridor": 825,
-    "North Jersey Coast":  500,
-    "Morris & Essex":      550,
-    "Montclair-Boonton":   415,
-    "Main/Bergen County":  450,
+    "Northeast Corridor": 800,
+    "North Jersey Coast":  200,
+    "Morris & Essex":      400,
+    "Montclair-Boonton":   350,
+    "Main/Bergen County":  300,
     "Raritan Valley":      450,
-    "Pascack Valley":      315,
+    "Pascack Valley":      100,
     "Port Jervis":         300,
     "Gladstone Branch":    300,
     "Atlantic City":       260,
@@ -217,8 +216,8 @@ def calculate_line_suspension_cost(raw_delay):
     This gives riders affected per hour, comparable to the Penn Station
     throughput approach used for system-wide Penn alerts.
 
-    A line suspension of M&E (550 riders × 5 trains/hr × $24) = $66,000.
-    An NEC suspension (825 × 8 × $24) = $158,400.
+    A line suspension of M&E (400 riders × 5 trains/hr × $44) = $88,000.
+    An NEC suspension (800 × 8 × $44) = $281,600.
     """
     line = raw_delay.get("line", "Unknown")
 
