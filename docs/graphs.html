@@ -497,7 +497,7 @@
     const SHEET_GID    = '1868128114';
 
     const METHODOLOGY_CHANGES = [
-      { date: '2026-05-04', label: 'Methodology v2' },
+      { after: '2026-04-30', label: 'Methodology v2.0' },
     ];
     // ============================================================
 
@@ -795,12 +795,12 @@
             tooltip: { enabled: false, external: makeTooltipHandler(data, avg) },
             annotation: {
               annotations: METHODOLOGY_CHANGES.reduce((acc, change, i) => {
-                const pt = data.find(d => d.date.toISOString().slice(0, 10) === change.date);
-                if (!pt) return acc;
+                const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === change.after);
+                if (idx === -1) return acc;
                 acc['method' + i] = {
                   type: 'line',
-                  xMin: pt.label,
-                  xMax: pt.label,
+                  xMin: idx + 0.5,
+                  xMax: idx + 0.5,
                   borderColor: 'rgba(180, 40, 40, 0.8)',
                   borderWidth: 2,
                   borderDash: [5, 3],
