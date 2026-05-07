@@ -254,7 +254,8 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
             for_web = spreadsheet.worksheet("for_web")
             for_web.update("A1", [[round(total_cost)]])
             for_web.update("A3", [[round(person_hours)]])
-            print(f"[LOGGER] for_web updated: A1={round(total_cost)}, A3={round(person_hours)}")
+            for_web.update("A4", [[report_date or ""]])
+            print(f"[LOGGER] for_web updated: A1={round(total_cost)}, A3={round(person_hours)}, A4={report_date}")
         except gspread.WorksheetNotFound:
             print("[LOGGER] for_web tab not found — create it manually and publish to web.")
         except Exception as web_err:

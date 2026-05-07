@@ -283,7 +283,7 @@
     <div class="hero-block">
       <p class="hero-lede">Every day New Jersey Transit runs late, and every day New Jersey commuters and New York City employers absorb the cost. <em>Here&rsquo;s how much.</em></p>
 
-      <p class="figure-label" id="figure-label-daily">Yesterday, New Jersey Transit delays cost commuters and New York City employers more than:</p>
+      <p class="figure-label" id="figure-label-daily">Most recently, New Jersey Transit delays cost commuters and New York City employers more than:</p>
       <p class="figure-primary" id="figure-daily">$&mdash;</p>
       <p class="figure-caption">in productive time, based on <strong id="figure-person-hours">&mdash;</strong> total hours of delays.</p>
 
@@ -334,15 +334,14 @@
     const SHEET_GID    = '1868128114';  // GID of the for_web tab
     // ============================================================
 
-    // "Yesterday," Tue–Sat; "Last Friday," Sun–Mon (data always reflects last business day)
-    (function () {
-      const label = document.getElementById('figure-label-daily');
-      if (!label) return;
-      const day = new Date().getDay(); // 0 = Sun, 1 = Mon
-      const prefix = (day === 0 || day === 1) ? 'Last Friday,' : 'Yesterday,';
-      label.textContent =
-        prefix + ' New Jersey Transit delays cost commuters and New York City employers more than:';
-    })();
+    function formatReportDate(raw) {
+      // raw is YYYY-MM-DD; parse as local date to avoid UTC-shift issues
+      const parts = String(raw).trim().split('-');
+      if (parts.length !== 3) return null;
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    }
 
     // Published CSV URL — works with sheets published via File → Share → Publish to web.
     const csvUrl =
@@ -382,6 +381,12 @@
         elDaily.textContent       = formatDollars(rows[0] || '');
         elCumulative.textContent  = formatDollars(rows[1] || '');
         elPersonHours.textContent = formatInteger(rows[2] || '');
+
+        const reportDate = formatReportDate(rows[3] || '');
+        const label = document.getElementById('figure-label-daily');
+        if (label && reportDate) {
+          label.textContent = 'On ' + reportDate + ', New Jersey Transit delays cost commuters and New York City employers more than:';
+        }
 
         elDaily.classList.remove('figure-loading');
         elCumulative.classList.remove('figure-loading');
