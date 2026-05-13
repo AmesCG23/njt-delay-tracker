@@ -361,8 +361,28 @@
         grid-template-columns: repeat(2, 1fr);
       }
 
+      .chart-controls {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .chart-wrap-main {
+        padding: 0.75rem 0.5rem 0.75rem;
+      }
+
+      .ctrl-btn {
+        font-size: 0.78rem;
+        padding: 0.25rem 0.55rem;
+      }
+
       footer {
         padding: 1rem 1.25rem;
+      }
+
+      .footer-nav {
+        gap: 1.25rem;
+        flex-wrap: wrap;
+        justify-content: center;
       }
     }
   </style>
@@ -742,6 +762,7 @@
     let showMA     = false;
 
     function buildChart(data) {
+      const isMobile = window.innerWidth <= 600;
       const canvas = document.getElementById('chart-hours');
       const ctx    = canvas.getContext('2d');
 
@@ -788,7 +809,7 @@
         options: {
           responsive: true,
           maintainAspectRatio: true,
-          aspectRatio: 2.4,
+          aspectRatio: isMobile ? 1.4 : 2.4,
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { display: false },
@@ -807,7 +828,7 @@
                   label: {
                     display: true,
                     content: change.label,
-                    position: 'start',
+                    position: 'end',
                     backgroundColor: 'rgba(180, 40, 40, 0.85)',
                     color: '#fff',
                     font: { family: FONT, size: 11 },
@@ -822,10 +843,10 @@
             x: {
               grid: { color: RULE_COLOR, lineWidth: 0.5 },
               ticks: {
-                font: { family: FONT, size: 12 },
+                font: { family: FONT, size: isMobile ? 10 : 12 },
                 maxRotation: 45,
                 autoSkip: true,
-                maxTicksLimit: 12,
+                maxTicksLimit: isMobile ? 5 : 12,
               },
             },
             y: {
@@ -839,7 +860,9 @@
               },
               ticks: {
                 font: { family: FONT, size: 12 },
-                callback: v => v.toLocaleString('en-US'),
+                callback: v => isMobile
+                  ? (v >= 1000 ? (v / 1000) + 'k' : v)
+                  : v.toLocaleString('en-US'),
               },
             },
           },
