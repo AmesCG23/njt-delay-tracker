@@ -860,7 +860,9 @@
               },
               ticks: {
                 font: { family: FONT, size: 12 },
-                callback: v => v.toLocaleString('en-US'),
+                callback: v => isMobile
+                  ? (v >= 1000 ? (v / 1000) + 'k' : v)
+                  : v.toLocaleString('en-US'),
               },
             },
           },
