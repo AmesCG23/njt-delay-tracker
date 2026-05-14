@@ -156,13 +156,15 @@ Connects to Bluesky's public API (no login needed for reading) and fetches posts
 
 The `njmetroalert` account posts everything — bus, light rail, and all rail lines. On a bad day it can post 200+ alerts, which can push morning alerts beyond the first page of results by the time the script runs at ~5pm. The fetcher paginates (up to 500 posts) to make sure it gets everything.
 
-**Three alert types recognized:**
+**Alert types recognized:**
 
 1. **System-wide Penn Station alert** (`system_wide=True, line_suspension=False`): "NJ TRANSIT rail service is subject to up to 20-minute delays into and out of Penn Station New York." Detected by `is_system_wide_alert()`. Must mention Penn Station + a system-wide pattern + ≥15 min delay.
 
 2. **Line-wide suspension** (`system_wide=True, line_suspension=True`): "Morris & Essex service is suspended in both directions." Detected by `is_line_suspension_alert()`. Must name a specific line + use suspension language + NOT mention Penn Station (which would make it type 1).
 
 3. **Normal per-train alert** (`system_wide=False`): "NEC train #3876, the 9:28 PM arrival to PSNY, is up to 25 min. late." Everything else that passes the rail/delay filters.
+
+4. **⚠️ PROVISIONAL — Hoboken Terminal diversion** (`system_wide=True, line_suspension=False`, line=`"System-Wide (Hoboken Diversion)"`): "NJ TRANSIT Midtown Direct eastbound service is being diverted into Hoboken Terminal." Detected by `is_hoboken_diversion_alert()` — matches any alert containing "divert\*" + "hoboken". Treated as a 60-minute Penn Station system-wide event (9,600 riders × $44/hr = $422,400) because Penn-bound commuters scramble to Hoboken and absorb the PATH transfer time — that's exactly what happened on 5/14/26 when fire department activity near Penn forced Midtown Direct into Hoboken. Uses a distinct dedup key from type 1 so both can coexist in the same window. **See "Provisional Changes Under Review" below before relying on this in production.**
 
 **Cross-account deduplication:** The same post sometimes appears from two accounts (e.g., an NEC delay shows up on both `njmetroalert` and `njtransit--nec`). Watcher deduplicates by normalized text before returning — same post from two accounts counts as one event.
 
@@ -542,6 +544,26 @@ Use this when you want to confirm the script saw the right things.
 
 ---
 
+## Provisional Changes Under Review
+
+These additions were made quickly in response to observed incidents and need more thought before being treated as settled methodology.
+
+### ⚠️ Hoboken Terminal diversion detection (added 5/14/26)
+
+**What it does:** `is_hoboken_diversion_alert()` in `watcher.py` catches alerts where "divert\*" and "hoboken" both appear, and treats the event as a 60-minute Penn Station system-wide delay. Cost: 9,600 riders/hr × 1 hr × $44 = $422,400.
+
+**Why:** On 5/14/26, fire department activity near Penn Station forced Midtown Direct service into Hoboken Terminal. The alert text contained no delay duration, so the old pipeline logged $0. Penn-bound riders had to take PATH onward — a real but uncounted cost.
+
+**Open questions before promoting to settled methodology:**
+- **Rider count:** The 9,600/hr Penn throughput figure may overcount here. Not every Penn rider is Midtown Direct; Hoboken diversions primarily affect M&E, MOBO, Main/Bergen, and PVL — not NEC. A line-specific rider figure would be more precise.
+- **Duration:** 60 minutes is the same assumption used for Penn system-wide delays, but a diversion often resolves faster (or slower) than a delay event. Worth checking actual incident durations.
+- **False positives:** The `divert* + hoboken` match is broad. Could catch a non-Midtown-Direct diversion (e.g., a freight detour, a bus reroute that slipped through filters). Monitor the Alert Log for unexpected matches.
+- **Match scope:** "1 of 2" multi-part alerts will both trigger the check independently, but they dedup to one event (same dedup key). Confirm this is correct behavior if the second post materially changes the picture.
+
+**To promote this to settled:** Revisit rider count methodology for Hoboken-terminal lines specifically, verify against 2–3 more real incidents, and update `methodology.html` to disclose the diversion calculation.
+
+---
+
 ## Known Bugs Fixed
 
 ### Evening window date rollover (fixed)
@@ -643,3 +665,5 @@ Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 ---
 
 *Last updated: May 14, 2026. Built collaboratively with Claude (Anthropic).*
+
+<!-- Provisional changes: Hoboken diversion detection (see "Provisional Changes Under Review") -->
