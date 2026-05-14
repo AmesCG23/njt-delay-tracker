@@ -285,13 +285,20 @@ def is_hoboken_diversion_alert(text):
     Provisional: detects Midtown Direct service diversions to Hoboken Terminal.
 
     When a Penn Station-area incident forces Midtown Direct trains into Hoboken,
-    every affected passenger must take PATH onward — a real delay that produces
-    no explicit delay-minutes figure in the alert text. Treated as a 60-minute
-    Penn Station system-wide event (conservative proxy for the PATH transfer cost).
+    every affected passenger must take PATH onward to reach Midtown — a real
+    delay with no explicit delay-minutes figure in the alert text.
 
-    Added for incidents like the 5/14/26 Penn Station complex fire. Review for
-    false positives if bus or non-rail accounts start using "divert"+"hoboken" phrasing.
-    Bus/LR alerts are already filtered before this check is reached.
+    We use Penn Station system-wide math (9,600 riders/hr × 60 min × $44/hr)
+    because that's who bears the cost: Penn-bound commuters scramble to Hoboken
+    and absorb the PATH transfer time. That's exactly what happened on 5/14/26
+    when fire department activity near Penn forced Midtown Direct into Hoboken.
+
+    Logged under "System-Wide (Hoboken Diversion)" — a distinct dedup key from
+    "System-Wide (Penn Station)" — so both alert types can coexist in the same
+    window without collapsing into one. Each deduplicates only against its own kind.
+
+    Review for false positives if bus or non-rail accounts start using
+    "divert"+"hoboken" phrasing. Bus/LR alerts are filtered before this is reached.
     """
     text_lower = text.lower()
     return bool(re.search(r"divert", text_lower)) and "hoboken" in text_lower
@@ -418,15 +425,14 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
                 print(f"[WATCHER] LINE SUSPENSION: {line} | {text[:80]}...")
                 continue
 
-            # Provisional: Hoboken Terminal diversion → 60-min Penn system-wide proxy.
-            # Catches incidents (e.g., 5/14/26 Penn complex fire) where Midtown Direct
-            # is rerouted to Hoboken with no explicit delay figure. Flows through the
-            # same system-wide dedup key ("System-Wide (Penn Station)", date) as any
-            # other Penn alert, so it won't double-count if both alert types appear.
+            # Provisional: Hoboken Terminal diversion → 60-min Penn system-wide math.
+            # Uses "System-Wide (Hoboken Diversion)" as the line so it deduplicates
+            # independently from "System-Wide (Penn Station)" alerts — both can appear
+            # in the same window and will be logged as separate events.
             if is_hoboken_diversion_alert(text):
                 candidates.append({
                     "text": text,
-                    "line": "System-Wide (Penn Station)",
+                    "line": "System-Wide (Hoboken Diversion)",
                     "delay_minutes": 60,
                     "timestamp": created_at,
                     "source": f"@{handle}",

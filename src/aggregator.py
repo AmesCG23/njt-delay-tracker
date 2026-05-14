@@ -90,7 +90,7 @@ def calculate_totals(deduplicated_delays):
 
         total_person_minutes += delay_mins * riders
         total_cost           += riders * (delay_mins / 60) * VTTS_RATE
-        if line not in ("Unknown", "System-Wide (Penn Station)"):
+        if line not in ("Unknown", "System-Wide (Penn Station)", "System-Wide (Hoboken Diversion)"):
             lines.add(line)
 
     return {
