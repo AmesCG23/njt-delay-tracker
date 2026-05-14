@@ -280,6 +280,23 @@ def is_line_suspension_alert(text):
     return True
 
 
+def is_hoboken_diversion_alert(text):
+    """
+    Provisional: detects Midtown Direct service diversions to Hoboken Terminal.
+
+    When a Penn Station-area incident forces Midtown Direct trains into Hoboken,
+    every affected passenger must take PATH onward — a real delay that produces
+    no explicit delay-minutes figure in the alert text. Treated as a 60-minute
+    Penn Station system-wide event (conservative proxy for the PATH transfer cost).
+
+    Added for incidents like the 5/14/26 Penn Station complex fire. Review for
+    false positives if bus or non-rail accounts start using "divert"+"hoboken" phrasing.
+    Bus/LR alerts are already filtered before this check is reached.
+    """
+    text_lower = text.lower()
+    return bool(re.search(r"divert", text_lower)) and "hoboken" in text_lower
+
+
 def is_rail_delay(text):
     """Returns True if this post is about a qualifying rail delay."""
     text_lower = text.lower()
@@ -399,6 +416,25 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
                 })
                 in_window_count += 1
                 print(f"[WATCHER] LINE SUSPENSION: {line} | {text[:80]}...")
+                continue
+
+            # Provisional: Hoboken Terminal diversion → 60-min Penn system-wide proxy.
+            # Catches incidents (e.g., 5/14/26 Penn complex fire) where Midtown Direct
+            # is rerouted to Hoboken with no explicit delay figure. Flows through the
+            # same system-wide dedup key ("System-Wide (Penn Station)", date) as any
+            # other Penn alert, so it won't double-count if both alert types appear.
+            if is_hoboken_diversion_alert(text):
+                candidates.append({
+                    "text": text,
+                    "line": "System-Wide (Penn Station)",
+                    "delay_minutes": 60,
+                    "timestamp": created_at,
+                    "source": f"@{handle}",
+                    "system_wide": True,
+                    "line_suspension": False,
+                })
+                in_window_count += 1
+                print(f"[WATCHER] HOBOKEN DIVERSION (Penn proxy, 60 min assumed): {text[:80]}...")
                 continue
 
             # Normal per-train rail delay
