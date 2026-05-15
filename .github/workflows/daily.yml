@@ -1,6 +1,6 @@
 # daily.yml — One daily run, Mon–Fri
 #
-# Scheduled at 13:00 UTC: 8am ET in winter (EST), 9am ET in summer (EDT).
+# Scheduled at 12:30 UTC: 7:30am ET in winter (EST), 8:30am ET in summer (EDT).
 # GitHub Actions cron is UTC-only and can't track DST, so this is the
 # closest single expression to "8am ET year-round."
 # With typical GitHub queue delays, expects to fire around 8–9am ET actual.
@@ -17,7 +17,7 @@ name: NJT Daily Pipeline
 
 on:
   schedule:
-    - cron: "0 13 * * 2-6"
+    - cron: "30 12 * * 2-6"
   workflow_dispatch:
     inputs:
       dry_run:
