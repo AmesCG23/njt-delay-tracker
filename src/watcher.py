@@ -23,7 +23,7 @@ from atproto import Client
 
 # ── Accounts to monitor ───────────────────────────────────────────────────────
 ALERT_ACCOUNTS = [
-    ("njmetroalert.bsky.social", None),                    # All lines — primary
+    ("njmetroalerts.bsky.social", None),                   # All lines — primary
     ("njtransit--nec.bsky.social", "Northeast Corridor"),  # NEC double-coverage
     ("njtransit-njcl.bsky.social", "North Jersey Coast"),  # NJCL double-coverage
     ("njtransit-me.bsky.social", "Morris & Essex"),
@@ -70,7 +70,7 @@ def fetch_account_posts(client, handle, window_start_utc, limit=100, max_posts=5
     Fetch posts from a Bluesky account, paginating until we reach posts
     older than the window start or hit max_posts.
 
-    njmetroalert.bsky.social posts alerts for ALL NJT services — bus,
+    njmetroalerts.bsky.social posts alerts for ALL NJT services — bus,
     light rail, and rail. On a bad day it can post 200+ alerts, pushing
     morning rail alerts beyond the first 100 posts by the time we run
     at ~5pm ET. Pagination ensures we always reach back far enough.
