@@ -178,7 +178,7 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
               morning_cost=0, evening_cost=0, report_date=None,
               nec_hours=0, me_hours=0, njcl_hours=0,
               mb_hours=0, rv_hours=0, mobo_hours=0, syswide_hours=0,
-              pvl_hours=0):
+              pvl_hours=0, hoboken_hours=0):
     """
     Append the daily summary tweet to the Tweet_log tab.
     Creates the tab and headers automatically if they don't exist.
@@ -197,6 +197,7 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
     Column P:    Montclair-Boonton person-hours
     Column Q:    System-wide (Penn Station) person-hours
     Column R:    Pascack Valley person-hours
+    Column S:    Other system-wide person-hours (Hoboken Terminal diversions)
     """
     sheet_id = os.environ.get("GOOGLE_SHEET_ID")
     if not sheet_id:
@@ -206,24 +207,26 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
         client = get_sheet_client()
         spreadsheet = client.open_by_key(sheet_id)
 
-        # Get or create Tweet_log tab (18 cols to cover A–R)
+        # Get or create Tweet_log tab (19 cols to cover A–S)
         try:
             tweet_tab = spreadsheet.worksheet(TWEET_LOG_TAB)
         except gspread.WorksheetNotFound:
-            tweet_tab = spreadsheet.add_worksheet(TWEET_LOG_TAB, rows=500, cols=18)
+            tweet_tab = spreadsheet.add_worksheet(TWEET_LOG_TAB, rows=500, cols=19)
 
-        # Write column headers for I–R if not already present
+        # Write column headers for I–S if not already present
         existing_i = tweet_tab.acell("I1").value
         if existing_i != "Morning Cost":
             tweet_tab.update("I1", [[
                 "Morning Cost", "Evening Cost",
                 "NEC Hours", "M&E Hours", "NJCL Hours",
                 "Main/Bergen Hours", "Raritan Hours", "MoBo Hours", "Syswide Hours",
-                "Pascack Valley Hours",
+                "Pascack Valley Hours", "Other Syswide Hours",
             ]])
-        elif not tweet_tab.acell("R1").value:
-            # Existing sheet missing the PVL column added later
-            tweet_tab.update("R1", [["Pascack Valley Hours"]])
+        else:
+            if not tweet_tab.acell("R1").value:
+                tweet_tab.update("R1", [["Pascack Valley Hours"]])
+            if not tweet_tab.acell("S1").value:
+                tweet_tab.update("S1", [["Other Syswide Hours"]])
 
         row = [
             datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S"),  # A: Timestamp
@@ -244,6 +247,7 @@ def log_tweet(text, total_cost, event_count, uri=None, person_hours=0,
             round(mobo_hours),                                 # P: Montclair-Boonton person-hours
             round(syswide_hours),                              # Q: System-wide (Penn Station) person-hours
             round(pvl_hours),                                  # R: Pascack Valley person-hours
+            round(hoboken_hours),                              # S: Other system-wide (Hoboken diversion) person-hours
         ]
         tweet_tab.append_row(row, value_input_option="USER_ENTERED")
         print(f"[LOGGER] Tweet logged to {TWEET_LOG_TAB} tab "
