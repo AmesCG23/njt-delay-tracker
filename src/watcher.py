@@ -4,8 +4,8 @@ Station 1: The Watcher (Single-Pass Edition)
 Fetches recent posts from NJ Transit alert accounts on Bluesky
 and returns those that fall within a specified time window.
 
-Called once at summary time (10:30am and 9:00pm ET).
-No continuous polling, no state file, no cache needed.
+Called once per daily run (~8:30am ET). No continuous polling,
+no state file, no cache needed.
 
 Since Bluesky stores all posts permanently, we can always reach back
 and retrieve everything posted during the rush window — no need to
@@ -13,7 +13,7 @@ collect in real time.
 
 Each returned delay dict has a "system_wide" boolean flag.
 System-wide Penn Station alerts are routed to a different cost
-calculation in main.py — see calculator.calculate_system_wide_cost().
+calculation in daily.py — see calculator.calculate_system_wide_cost().
 """
 
 import re
@@ -72,8 +72,8 @@ def fetch_account_posts(client, handle, window_start_utc, limit=100, max_posts=5
 
     njmetroalerts.bsky.social posts alerts for ALL NJT services — bus,
     light rail, and rail. On a bad day it can post 200+ alerts, pushing
-    morning rail alerts beyond the first 100 posts by the time we run
-    at ~5pm ET. Pagination ensures we always reach back far enough.
+    morning rush alerts beyond the first 100 posts. Pagination ensures
+    we always reach back far enough.
 
     max_posts is a safety cap to avoid runaway API calls. 500 posts
     covers roughly 8-10 hours of even a very active alert account.
@@ -397,16 +397,25 @@ def get_window_delays(window_start_utc, window_end_utc, min_delay_minutes=10):
             # Check for Penn Station system-wide alert first
             if is_system_wide_alert(text):
                 delay_minutes = extract_delay_minutes(text)
+                # Suspension-language alerts carry no stated delay duration.
+                # Treat as 60 minutes (same as cancellation assumption) and flag
+                # as provisional so the deduplicator can override it if a later
+                # alert in the same window states an explicit duration.
+                delay_provisional = delay_minutes is None
+                if delay_provisional:
+                    delay_minutes = 60
                 candidates.append({
                     "text": text,
                     "line": "System-Wide (Penn Station)",
                     "delay_minutes": delay_minutes,
+                    "delay_provisional": delay_provisional,
                     "timestamp": created_at,
                     "source": f"@{handle}",
                     "system_wide": True,
                 })
                 in_window_count += 1
-                print(f"[WATCHER] PENN SYSTEM-WIDE: {delay_minutes} min | {text[:80]}...")
+                prov_tag = " [provisional 60-min assumption]" if delay_provisional else ""
+                print(f"[WATCHER] PENN SYSTEM-WIDE: {delay_minutes} min{prov_tag} | {text[:80]}...")
                 continue
 
             # Check for line-level suspension

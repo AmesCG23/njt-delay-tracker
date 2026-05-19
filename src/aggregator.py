@@ -42,13 +42,24 @@ def deduplicate_by_train(delays):
             date_str = "unknown"
 
         if is_system:
-            # Dedup system-wide events by (line, date), keep highest cost
+            # Dedup system-wide events by (line, date).
+            # A stated delay time always overrides a provisional 60-min assumption;
+            # among same-certainty entries, keep the higher delay_minutes.
+            # (dollar_estimate is not yet set at dedup time, so we compare minutes.)
             line = entry.get("line", "Unknown")
             key = (line, date_str)
-            this_cost = entry.get("dollar_estimate") or 0
-            existing_cost = (best_syswide[key].get("dollar_estimate") or 0) if key in best_syswide else 0
-            if key not in best_syswide or this_cost > existing_cost:
+            if key not in best_syswide:
                 best_syswide[key] = entry
+            else:
+                existing = best_syswide[key]
+                existing_prov = existing.get("delay_provisional", False)
+                new_prov = entry.get("delay_provisional", False)
+                if existing_prov and not new_prov:
+                    best_syswide[key] = entry   # stated overrides provisional
+                elif not existing_prov and new_prov:
+                    pass                          # keep existing stated
+                elif (entry.get("delay_minutes") or 0) > (existing.get("delay_minutes") or 0):
+                    best_syswide[key] = entry   # same certainty, higher delay wins
 
         elif train:
             # Normal per-train dedup: keep highest delay

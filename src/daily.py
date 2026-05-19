@@ -1,7 +1,7 @@
 """
 daily.py — The Full Daily Pipeline
 ------------------------------------
-Runs once per weekday at ~3pm-5pm ET.
+Runs once per weekday at ~7:30–8:30am ET (12:30 UTC).
 
 Fetches yesterday's delays from Bluesky in two passes (morning, then
 evening), processes each window independently, logs to Google Sheets,
@@ -267,28 +267,31 @@ def process_window(label, start_utc, end_utc):
 
 def compute_line_hours(events):
     """
-    Sum person-hours by line for the per-line columns in Tweet_log (K–Q).
+    Sum person-hours by line for the per-line columns in Tweet_log (K–S).
 
-    System-wide Penn Station events (system_wide=True, not line_suspension)
-    are bucketed under "_system_wide" rather than any specific line.
+    Penn Station system-wide events → "_penn_syswide" (column Q).
+    Hoboken diversion events → "_hoboken_diversion" (column S).
     Line suspensions are attributed to their named line like normal events.
     """
     totals = {
-        "Northeast Corridor": 0.0,
-        "Morris & Essex":     0.0,
-        "North Jersey Coast": 0.0,
-        "Main/Bergen County": 0.0,
-        "Raritan Valley":     0.0,
-        "Montclair-Boonton":  0.0,
-        "Pascack Valley":     0.0,
-        "_system_wide":       0.0,
+        "Northeast Corridor":  0.0,
+        "Morris & Essex":      0.0,
+        "North Jersey Coast":  0.0,
+        "Main/Bergen County":  0.0,
+        "Raritan Valley":      0.0,
+        "Montclair-Boonton":   0.0,
+        "Pascack Valley":      0.0,
+        "_penn_syswide":       0.0,
+        "_hoboken_diversion":  0.0,
     }
     for ev in events:
         line = ev.get("line", "")
-        is_penn_syswide = ev.get("system_wide", False) and not ev.get("line_suspension", False)
         hrs = (ev.get("estimated_riders") or 0) * (ev.get("delay_minutes") or 0) / 60
-        if is_penn_syswide:
-            totals["_system_wide"] += hrs
+        if ev.get("system_wide", False) and not ev.get("line_suspension", False):
+            if line == "System-Wide (Hoboken Diversion)":
+                totals["_hoboken_diversion"] += hrs
+            else:
+                totals["_penn_syswide"] += hrs
         elif line in totals:
             totals[line] += hrs
     return totals
@@ -470,7 +473,8 @@ def run():
                 mb_hours=line_hours["Main/Bergen County"],
                 rv_hours=line_hours["Raritan Valley"],
                 mobo_hours=line_hours["Montclair-Boonton"],
-                syswide_hours=line_hours["_system_wide"],
+                syswide_hours=line_hours["_penn_syswide"],
+                hoboken_hours=line_hours["_hoboken_diversion"],
                 pvl_hours=line_hours["Pascack Valley"],
             )
         except Exception as e:

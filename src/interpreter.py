@@ -75,7 +75,13 @@ Rules:
 - Cause should be 3-6 words maximum
 - Line name abbreviations: NEC = Northeast Corridor, NJCL = North Jersey Coast Line,
   M&E or M and E or Morris and Essex = Morris & Essex, MOBO = Montclair-Boonton,
-  MBPJ = Main/Bergen County, RVL = Raritan Valley, PVL = Pascack Valley"""
+  MBPJ = Main/Bergen County, RVL = Raritan Valley, PVL = Pascack Valley
+- "Please take train #XXXX" or "please board train #XXXX" identifies a REPLACEMENT
+  train being offered to affected passengers — it is NOT the cancelled or delayed train.
+  Do not use that number as train_number. Use the originally delayed/cancelled train
+  number if one is explicitly stated, or null if the alert describes a general
+  cancellation (e.g. "2 of 3 cancelled") with no specific train number for the
+  affected service."""
 
     try:
         message = client.messages.create(
@@ -127,6 +133,9 @@ if __name__ == "__main__":
         "Morris & Essex Line rail service is operating on or close to schedule.",
         "MOBO train # 1000, the 7:43 AM arrival into Hoboken Terminal, is up to 15 minutes late following earlier mechanical issues.",
         "NEC train #3949, the 5:03 PM departure from PSNY, scheduled to arrive in Trenton at 6:17 PM, is cancelled due to crew availability.",
+        # Replacement-train pattern: #3735 is the replacement, not the cancelled train.
+        # Expected: train_number=null, is_cancellation=true
+        "NJ Transit Rail: 2. of 3. is cancelled in PSNY due to equipment availability resulting from mechanical issues. Please take train #3735, the 7:43 PM departure from PSNY.",
     ]
 
     for alert in test_alerts:

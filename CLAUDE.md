@@ -65,7 +65,7 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 │   ├── aggregator.py            ← deduplicates events, sums totals
 │   └── logger.py                ← writes to Google Sheets (all tabs)
 └── .github/workflows/
-    ├── daily.yml                ← automated daily run, Tue–Sat at 20:00 UTC
+    ├── daily.yml                ← automated daily run, Tue–Sat at 12:30 UTC (~8:30am ET)
     └── benchmark.yml            ← manual dry-run against any historical date
 ```
 
@@ -77,13 +77,13 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 
 ### Schedule
 
-`daily.yml` fires on GitHub Actions at **20:00 UTC, Tuesday through Saturday**. That translates to roughly 3–4pm ET (the cron can't track DST), and with typical GitHub queue delays, the script usually actually runs around 4–5pm ET.
+`daily.yml` fires on GitHub Actions at **12:30 UTC, Tuesday through Saturday**. That translates to 7:30am EST in winter / 8:30am EDT in summer (the cron can't track DST), and with typical GitHub queue delays, the script usually actually runs around 8–9am ET.
 
 The workflow runs Tuesday–Saturday so that Tuesday covers Monday's delays, and Saturday covers Friday's delays — the "yesterday" logic means you need to run the day after.
 
 ### What "yesterday" means
 
-When the script runs on Tuesday at 4pm ET, it fetches Monday's alerts. It calculates what time Monday's rush windows were in UTC (accounting for EST vs. EDT automatically using Python's `ZoneInfo`), then queries Bluesky's API for posts from those accounts within those time windows.
+When the script runs on Tuesday at ~8:30am ET, it fetches Monday's alerts. It calculates what time Monday's rush windows were in UTC (accounting for EST vs. EDT automatically using Python's `ZoneInfo`), then queries Bluesky's API for posts from those accounts within those time windows.
 
 - **Morning rush:** 5:00 AM – 10:30 AM Eastern Time (yesterday)
 - **Evening rush:** 3:00 PM – 8:30 PM Eastern Time (yesterday)
@@ -126,7 +126,7 @@ This is the entry point. When GitHub Actions runs `python src/daily.py`, everyth
 
 `calculate_window(deduped_delays)` — Routes each event to the right calculator based on its `system_wide` and `line_suspension` flags.
 
-`compute_line_hours(events)` — Before logging the tweet, tallies person-hours by line. This feeds the per-line columns (K–R) in Tweet_log, which powers the "by line" bar chart on the website.
+`compute_line_hours(events)` — Before logging the tweet, tallies person-hours by line. This feeds the per-line columns (K–S) in Tweet_log, which powers the "by line" bar chart on the website.
 
 `format_tweet(yesterday_et, totals)` — Builds the text of the daily Bluesky post. Two formats: normal delays (total person-hours + cost + event count), or "good news" (no qualifying delays found). Has a 295-character safety cap.
 
@@ -340,7 +340,7 @@ This tab exists so you can see the cumulative total at a glance. The formula upd
 
 ### Tab 3: Tweet_log (accumulates forever — never wiped)
 
-One row per daily summary post. 18 columns, A–R. Written by `log_tweet()` after each post.
+One row per daily summary post. 19 columns, A–S. Written by `log_tweet()` after each post.
 
 | Column | Content |
 |---|---|
@@ -362,8 +362,9 @@ One row per daily summary post. 18 columns, A–R. Written by `log_tweet()` afte
 | P | Montclair-Boonton person-hours |
 | Q | System-Wide (Penn Station) person-hours |
 | R | Pascack Valley person-hours |
+| S | Other system-wide person-hours (Hoboken Terminal diversions) |
 
-Columns K–R power the "by line" bar chart on `graphs.html`. Column G powers the time-series chart.
+Columns K–S power the "by line" bar chart on `graphs.html`. Column G powers the time-series chart.
 
 ### Tab 4: Alert Log (wiped and rewritten at start of each daily run)
 
@@ -450,7 +451,7 @@ Uses Chart.js (loaded from CDN). Three charts:
 
 1. **Line chart:** Daily person-hours of delay over time. Reads Tweet_log column G (person-hours) and column F (report date). Includes a 3-day moving average toggle, CSV export, and PNG export. Uses `TWEET_LOG_GID = '943972512'` — this GID must be published separately from for_web.
 
-2. **Bar chart (horizontal):** Cumulative person-hours by rail line, from Tweet_log columns K–R.
+2. **Bar chart (horizontal):** Cumulative person-hours by rail line, from Tweet_log columns K–S.
 
 3. **Doughnut:** Morning vs. evening share of total cost, from `for_web` A6 and A7.
 
@@ -466,7 +467,7 @@ Static HTML. No dynamic data. Update the prose here when the methodology changes
 
 ### `daily.yml` — The Main Pipeline
 
-**Schedule:** `cron: "0 20 * * 2-6"` — 20:00 UTC, Tuesday through Saturday  
+**Schedule:** `cron: "30 12 * * 2-6"` — 12:30 UTC, Tuesday through Saturday (~8:30am ET)  
 **Timeout:** 15 minutes  
 **Manual trigger:** `workflow_dispatch` with a `dry_run` input (default `true`)
 
