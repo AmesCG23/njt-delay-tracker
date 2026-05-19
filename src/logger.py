@@ -93,15 +93,6 @@ def _build_event_row(delay_data):
     ]
 
 
-def log_delay(delay_data):
-    """
-    Append a single delay event to the Event Log tab.
-    Kept for backwards compatibility — prefer log_delay_batch() for
-    bulk writes to avoid hitting the Sheets API rate limit.
-    """
-    log_delay_batch([delay_data])
-
-
 def log_delay_batch(delay_list):
     """
     Write a list of delay events to the Event Log in ONE API call.
@@ -138,19 +129,6 @@ def log_delay_batch(delay_list):
         raise
 
 
-def mark_as_posted(row_number):
-    """Mark a row as posted to Bluesky (updates column M)."""
-    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
-    try:
-        client = get_sheet_client()
-        spreadsheet = client.open_by_key(sheet_id)
-        log_tab = spreadsheet.worksheet(EVENT_LOG_TAB)
-        # Column M (13) is "Posted to Bluesky"
-        log_tab.update_cell(row_number, 13, "Yes")
-    except Exception as e:
-        print(f"[LOGGER] Could not mark row as posted: {e}")
-
-
 # ── Run standalone for testing ────────────────────────────────────────────────
 if __name__ == "__main__":
     test_delay = {
@@ -167,8 +145,7 @@ if __name__ == "__main__":
         "timestamp": datetime.now(_ET).isoformat(),
     }
 
-    running_total = log_delay(test_delay)
-    print(f"Running total: ${running_total:,.2f}" if running_total else "Could not read running total.")
+    log_delay_batch([test_delay])
 
 
 TWEET_LOG_TAB = "Tweet_log"
@@ -375,10 +352,10 @@ def log_run_summary(post_date, post_time, post_uri):
         run_tab = spreadsheet.worksheet(RUN_LOG_TAB)
 
         all_rows = run_tab.get_all_values()
-        for i, row in enumerate(all_rows[1:], start=2):  # skip header
-            run_tab.update(f"F{i}", post_date)
-            run_tab.update(f"G{i}", post_time)
-            run_tab.update(f"H{i}", post_uri or "")
+        n_data = len(all_rows) - 1  # exclude header
+        if n_data > 0:
+            fill = [[post_date, post_time, post_uri or ""]] * n_data
+            run_tab.update(f"F2:H{1 + n_data}", fill)
 
         print(f"[LOGGER] Run Log updated with post details.")
 

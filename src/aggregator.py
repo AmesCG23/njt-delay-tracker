@@ -8,9 +8,6 @@ and formats the summary post.
 No file I/O. Operates purely on the list passed in.
 """
 
-from calculator import VTTS_RATE
-
-
 def deduplicate_by_train(delays):
     """
     Keep only the highest observed delay per event key:
@@ -100,7 +97,7 @@ def calculate_totals(deduplicated_delays):
         line       = entry.get("line", "Unknown")
 
         total_person_minutes += delay_mins * riders
-        total_cost           += riders * (delay_mins / 60) * VTTS_RATE
+        total_cost           += entry.get("dollar_estimate") or 0
         if line not in ("Unknown", "System-Wide (Penn Station)", "System-Wide (Hoboken Diversion)"):
             lines.add(line)
 
