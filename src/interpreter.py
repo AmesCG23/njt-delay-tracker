@@ -11,20 +11,6 @@ import anthropic
 import json
 import os
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-
-# Time bands for ridership lookup
-def get_time_band():
-    """Returns 'peak', 'off_peak', or 'weekend' based on current Eastern Time."""
-    now = datetime.now(ZoneInfo("America/New_York"))
-    hour = now.hour
-    weekday = now.weekday()  # 0=Monday, 6=Sunday
-
-    if weekday >= 5:  # Saturday or Sunday
-        return "weekend"
-    if (6 <= hour < 9) or (16 <= hour < 19):  # Peak hours
-        return "peak"
-    return "off_peak"
 
 
 def interpret_alert(alert_text, delay_minutes_hint=None):
@@ -109,8 +95,8 @@ Rules:
         if parsed.get("delay_minutes") is None and delay_minutes_hint is not None:
             parsed["delay_minutes"] = delay_minutes_hint
 
-        # Add time band and raw text
-        parsed["time_band"] = get_time_band()
+        # All monitoring occurs during peak windows
+        parsed["time_band"] = "peak"
         parsed["raw_text"] = alert_text
         parsed["timestamp"] = datetime.now(timezone.utc).isoformat()
 

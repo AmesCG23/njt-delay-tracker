@@ -260,7 +260,7 @@ def is_line_suspension_alert(text):
     line_signals = [
         "northeast corridor", "nec ",
         "north jersey coast", "njcl", "nj coast", "coast line", "jersey coast line",
-        "morris & essex", "morris and essex", "m and e", "m&e", "m and e", "m&e",
+        "morris & essex", "morris and essex", "m and e", "m&e",
         "montclair-boonton", "montclair boonton", "mobo",
         "main/bergen", "main bergen", "mbpj", "main line", "bergen county line", "bergen line", "main-bergen",
         "raritan valley", "rvl",

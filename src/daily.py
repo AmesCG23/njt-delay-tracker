@@ -48,6 +48,19 @@ from logger import log_delay_batch, log_tweet, clear_run_log, log_run, log_run_s
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
 
+RESOLUTION_PHRASES = [
+    "on or close to schedule",
+    "normal service",
+    "service has resumed",
+    "service restored",
+    "service has been restored",
+    "trains are running",
+    "back on schedule",
+    "cleared",
+    "no longer",
+    "resuming",
+]
+
 # OVERRIDE_DATE: if set (YYYY-MM-DD), use this as "yesterday" instead of computing
 # from the current time. Used by the benchmark workflow to replay known dates.
 OVERRIDE_DATE = os.environ.get("OVERRIDE_DATE", "").strip()
@@ -132,23 +145,9 @@ def interpret_window(raw_delays):
             # the line and delay, don't silently drop it. Build a minimal event
             # from the watcher's data so RVL/Hoboken alerts aren't lost.
             #
-            # Backstop: first check the raw text for resolution/restoration
-            # language. If Haiku returned null because the alert is saying
-            # "service has resumed" or "trains are back on schedule," we should
-            # trust that null and drop the event — not resurrect it from
-            # watcher data that may have extracted a stale delay figure.
-            RESOLUTION_PHRASES = [
-                "on or close to schedule",
-                "normal service",
-                "service has resumed",
-                "service restored",
-                "service has been restored",
-                "trains are running",
-                "back on schedule",
-                "cleared",
-                "no longer",
-                "resuming",
-            ]
+            # Backstop: first check for resolution language. If Haiku returned
+            # null because the alert says "service has resumed," trust that null
+            # rather than resurrecting a stale delay figure from the watcher.
             raw_text = raw.get("text", "").lower()
             is_resolution = any(p in raw_text for p in RESOLUTION_PHRASES)
             if is_resolution:
@@ -234,11 +233,8 @@ def process_window(label, start_utc, end_utc):
     print(f"[DAILY] {len(interp)} posts after interpretation.")
 
     # 2b. Log all interpreted alerts before dedup (for hand-checking)
-    # Imported here to avoid circular imports at module level
-    import os as _os
-    if _os.environ.get("DRY_RUN", "false").lower() != "true":
+    if not DRY_RUN:
         try:
-            from logger import log_alert_batch
             log_alert_batch(interp)
         except Exception as _e:
             print(f"[DAILY] Alert Log write failed: {_e}")
