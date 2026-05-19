@@ -146,7 +146,7 @@ Connects to Bluesky's public API (no login needed for reading) and fetches posts
 
 | Account | Coverage |
 |---|---|
-| `njmetroalert.bsky.social` | All lines — primary, highest volume |
+| `njmetroalerts.bsky.social` | All lines — primary, highest volume |
 | `njtransit--nec.bsky.social` | NEC only (note: double dash) |
 | `njtransit-njcl.bsky.social` | North Jersey Coast only |
 | `njtransit-me.bsky.social` | Morris & Essex only |
@@ -154,7 +154,7 @@ Connects to Bluesky's public API (no login needed for reading) and fetches posts
 | `njtransit-mbpj.bsky.social` | Main/Bergen County only |
 | `njtransit-pvl.bsky.social` | Pascack Valley only |
 
-The `njmetroalert` account posts everything — bus, light rail, and all rail lines. On a bad day it can post 200+ alerts, which can push morning alerts beyond the first page of results by the time the script runs at ~5pm. The fetcher paginates (up to 500 posts) to make sure it gets everything.
+The `njmetroalerts` account posts everything — bus, light rail, and all rail lines. On a bad day it can post 200+ alerts, which can push morning alerts beyond the first page of results by the time the script runs at ~5pm. The fetcher paginates (up to 500 posts) to make sure it gets everything.
 
 **Alert types recognized:**
 
@@ -166,7 +166,7 @@ The `njmetroalert` account posts everything — bus, light rail, and all rail li
 
 4. **⚠️ PROVISIONAL — Hoboken Terminal diversion** (`system_wide=True, line_suspension=False`, line=`"System-Wide (Hoboken Diversion)"`): "NJ TRANSIT Midtown Direct eastbound service is being diverted into Hoboken Terminal." Detected by `is_hoboken_diversion_alert()` — matches any alert containing "divert\*" + "hoboken". Treated as a 60-minute Penn Station system-wide event (9,600 riders × $44/hr = $422,400) because Penn-bound commuters scramble to Hoboken and absorb the PATH transfer time — that's exactly what happened on 5/14/26 when fire department activity near Penn forced Midtown Direct into Hoboken. Uses a distinct dedup key from type 1 so both can coexist in the same window. **See "Provisional Changes Under Review" below before relying on this in production.**
 
-**Cross-account deduplication:** The same post sometimes appears from two accounts (e.g., an NEC delay shows up on both `njmetroalert` and `njtransit--nec`). Watcher deduplicates by normalized text before returning — same post from two accounts counts as one event.
+**Cross-account deduplication:** The same post sometimes appears from two accounts (e.g., an NEC delay shows up on both `njmetroalerts` and `njtransit--nec`). Watcher deduplicates by normalized text before returning — same post from two accounts counts as one event.
 
 **Filters applied:**
 - Must contain a delay keyword ("late", "delayed", "cancelled", "suspended", etc.)

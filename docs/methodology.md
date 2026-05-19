@@ -3,7 +3,7 @@ This tracker's methodology remains a work in progress. We hope to refine it by o
 
 ## Scraper
 
-The core of the Delay Tracker is a scraper that pulls matching NJT delay alerts from a series of automated Bluesky accounts, chiefly [NJMetroAlert](https://bsky.app/profile/njmetroalert.bsky.social). Claude (Haiku) parses the alerts for line, train number, and delay information, then deduplicates by preserving the longest delay per train number.
+The core of the Delay Tracker is a scraper that pulls matching NJT delay alerts from a series of automated Bluesky accounts, chiefly [NJMetroAlert](https://bsky.app/profile/njmetroalerts.bsky.social). Claude (Haiku) parses the alerts for line, train number, and delay information, then deduplicates by preserving the longest delay per train number.
 
 The scraper looks for delays between 5:00 AM and 10:30 AM for the morning rush, and 3:00 PM and 8:30 PM for the evening rush. These are larger windows than traditional "peak" times but the effects of this wider "net" should cancel out without biasing our estimates. On the one hand, we observe more delays. On the other hand, we estimate lower ridership *per* train (see next section).
 
