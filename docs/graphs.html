@@ -519,6 +519,9 @@
     const METHODOLOGY_CHANGES = [
       { after: '2026-05-01', label: 'Methodology v2.0' },
     ];
+    const INCIDENT_MARKERS = [
+      { date: '2026-05-29', label: 'Penn Station fire injures 5' },
+    ];
     // ============================================================
 
     const csvUrl =
@@ -820,28 +823,52 @@
             legend: { display: false },
             tooltip: { enabled: false, external: makeTooltipHandler(data, avg) },
             annotation: {
-              annotations: METHODOLOGY_CHANGES.reduce((acc, change, i) => {
-                const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === change.after);
-                if (idx === -1) return acc;
-                acc['method' + i] = {
-                  type: 'line',
-                  xMin: idx + 0.5,
-                  xMax: idx + 0.5,
-                  borderColor: 'rgba(180, 40, 40, 0.8)',
-                  borderWidth: 2,
-                  borderDash: [5, 3],
-                  label: {
-                    display: true,
-                    content: change.label,
-                    position: 'end',
-                    backgroundColor: 'rgba(180, 40, 40, 0.85)',
-                    color: '#fff',
-                    font: { family: FONT, size: 11 },
-                    padding: { x: 6, y: 3 },
-                  },
-                };
+              annotations: (() => {
+                const acc = {};
+                METHODOLOGY_CHANGES.forEach((change, i) => {
+                  const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === change.after);
+                  if (idx === -1) return;
+                  acc['method' + i] = {
+                    type: 'line',
+                    xMin: idx + 0.5,
+                    xMax: idx + 0.5,
+                    borderColor: 'rgba(180, 40, 40, 0.8)',
+                    borderWidth: 2,
+                    borderDash: [5, 3],
+                    label: {
+                      display: true,
+                      content: change.label,
+                      position: 'end',
+                      backgroundColor: 'rgba(180, 40, 40, 0.85)',
+                      color: '#fff',
+                      font: { family: FONT, size: 11 },
+                      padding: { x: 6, y: 3 },
+                    },
+                  };
+                });
+                INCIDENT_MARKERS.forEach((marker, i) => {
+                  const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === marker.date);
+                  if (idx === -1) return;
+                  acc['incident' + i] = {
+                    type: 'line',
+                    xMin: idx,
+                    xMax: idx,
+                    borderColor: 'rgba(180, 40, 40, 0.8)',
+                    borderWidth: 2,
+                    borderDash: [5, 3],
+                    label: {
+                      display: true,
+                      content: marker.label,
+                      position: 'end',
+                      backgroundColor: 'rgba(180, 40, 40, 0.85)',
+                      color: '#fff',
+                      font: { family: FONT, size: 11 },
+                      padding: { x: 6, y: 3 },
+                    },
+                  };
+                });
                 return acc;
-              }, {}),
+              })(),
             },
           },
           scales: {
