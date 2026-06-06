@@ -285,26 +285,28 @@
     };
 
     // Soccer ball — 16 × 16 px
-    // Proper filled pentagon patches: solid 4-wide bar at top/bottom,
-    // 2-wide bands at left/right sides — no corner-bracket artifacts.
+    // One central downward-pointing pentagon (flat top, pointed bottom)
+    // floating INSIDE the white area — not at the edges. Classic NES/
+    // Sensible-Soccer visual shorthand. Two 3×2 flank patches lower-left
+    // and lower-right, separated from the circle outline by white pixels.
     const BALL = [
       //  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  // 0  top arc
-          [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  // 1
-          [0, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 0],  // 2  TOP PATCH: 4-wide solid bar
-          [1, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1],  // 3  pentagon feet spread out
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 4  white
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 5  white
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 6  white
-          [1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1],  // 7  LEFT+RIGHT 2-wide bands
-          [1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1],  // 8  LEFT+RIGHT 2-wide bands
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 9  white
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 10 white
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 11 white
-          [1, 2, 2, 2, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 1],  // 12 BOTTOM pentagon feet
-          [0, 1, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 0],  // 13 BOTTOM PATCH: 4-wide solid bar
+          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  //  0  top arc
+          [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  //  1
+          [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  //  2
+          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  3  white
+          [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  4  pentagon flat top (cols 5–9)
+          [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  5  pentagon body
+          [1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1],  //  6  pentagon narrows (cols 6–8)
+          [1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1],  //  7  pentagon point (col 7)
+          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  8  white
+          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  9  white
+          [1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1],  // 10  lower-left (cols 3–5) + lower-right (cols 10–12)
+          [1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1],  // 11  patches continue (3 wide × 2 tall each)
+          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 12  white
+          [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  // 13
           [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  // 14
-          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  // 15 bottom arc
+          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  // 15  bottom arc
     ];
 
     // Vuvuzela — 20 × 8 px, pointing right
