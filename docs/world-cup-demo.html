@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚽ World Cup Mode — NJT Delay Tracker (Demo)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --newsprint: #f0eeeb;
+      --ink: #1a1a1a;
+      --ink-light: #4a4a4a;
+      --ink-faint: #8a8a8a;
+      --rule: #c0bdb8;
+    }
+
+    body {
+      font-family: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+      background-color: var(--newsprint);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* === HEADER === */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+    }
+
+    .logo img { height: 64px; width: auto; display: block; }
+
+    /* Right side of header: Bluesky icon stacked above the WC toggle */
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .social-icons { display: flex; gap: 0.75rem; align-items: center; }
+    .social-icons a { color: var(--ink-light); text-decoration: none; transition: color 0.2s ease; display: flex; align-items: center; }
+    .social-icons a:hover { color: var(--ink); }
+    .social-icons svg { width: 32px; height: 32px; }
+
+    /* === MAIN === */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 2rem 3rem;
+      text-align: center;
+    }
+
+    .hero-block { max-width: 640px; width: 100%; }
+    .figure-label { font-size: 1.15rem; font-weight: 400; color: var(--ink-light); margin-bottom: 0.3rem; letter-spacing: 0.02em; }
+    .figure-primary { font-size: 3.5rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; margin-bottom: 0.25rem; }
+    .figure-caption { font-size: 1.05rem; font-weight: 400; color: var(--ink-light); font-style: italic; margin-bottom: 2.5rem; }
+    .figure-secondary { font-size: 5rem; font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
+    .figure-caption-secondary { font-size: 1.05rem; font-weight: 400; color: var(--ink-light); font-style: italic; margin-bottom: 2.5rem; }
+    .hero-lede { font-size: 1.5rem; font-weight: 400; line-height: 1.45; color: var(--ink); max-width: 520px; margin: 0 auto 2rem; }
+    .body-text { font-size: 1.5rem; line-height: 1.65; color: var(--ink); max-width: 520px; margin: 0 auto 1.25rem; }
+
+    /* === FOOTER === */
+    footer { border-top: 1px solid var(--rule); padding: 1.25rem 2rem; text-align: center; }
+    .footer-text { font-size: 0.8rem; color: var(--ink-faint); line-height: 1.5; max-width: 600px; margin: 0 auto; }
+    .footer-text a { color: var(--ink-faint); text-decoration: underline; text-underline-offset: 2px; }
+    .footer-text + .footer-text { margin-top: 0.5rem; }
+    .footer-kofi { font-size: 0.8rem; color: var(--ink-faint); line-height: 1.5; max-width: 600px; margin: 0.75rem auto 0; }
+    .footer-kofi a { color: var(--ink-light); text-decoration: underline; text-underline-offset: 2px; }
+    .footer-nav { display: flex; justify-content: center; gap: 2rem; margin-bottom: 0.75rem; }
+    footer hr { border: none; border-top: 1px solid var(--rule); max-width: 600px; margin: 1rem auto; }
+    .footer-nav a { font-size: 0.9rem; font-weight: 700; color: var(--ink); text-decoration: none; }
+    .footer-nav a:hover { color: var(--ink-light); text-decoration: underline; }
+
+    @media (max-width: 600px) {
+      header { padding: 1rem 1.25rem; }
+      main { padding: 1.5rem 1.25rem 2rem; }
+      .figure-primary { font-size: 2.5rem; }
+      .hero-lede { font-size: 1.15rem; }
+      .body-text { font-size: 1.15rem; }
+      .figure-secondary { font-size: 3.5rem; }
+      footer { padding: 1rem 1.25rem; }
+    }
+
+    /* ================================================================
+       WORLD CUP MODE
+       ================================================================ */
+
+    #wc-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 8000;
+      overflow: hidden;
+    }
+
+    .wc-floater {
+      position: absolute;
+      pointer-events: none;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      will-change: transform, opacity;
+    }
+
+    /* Balls spin as they rise, swaying side to side */
+    @keyframes wcBall {
+      0%   { transform: translateY(0)      translateX(0px)   rotate(0deg);   opacity: 0;   }
+      7%   {                                                                  opacity: 0.92; }
+      25%  { transform: translateY(-25vh)  translateX(28px)  rotate(100deg); }
+      50%  { transform: translateY(-50vh)  translateX(-22px) rotate(200deg); }
+      75%  { transform: translateY(-75vh)  translateX(18px)  rotate(300deg); }
+      93%  {                                                                  opacity: 0.92; }
+      100% { transform: translateY(-110vh) translateX(0px)   rotate(400deg); opacity: 0;   }
+    }
+
+    /* Vuvuzelas drift up tilted, no spin */
+    @keyframes wcVuvu {
+      0%   { transform: translateY(0)      rotate(-38deg); opacity: 0;   }
+      7%   {                               opacity: 0.88; }
+      33%  { transform: translateY(-33vh)  rotate(-43deg); }
+      66%  { transform: translateY(-66vh)  rotate(-34deg); }
+      93%  {                               opacity: 0.88; }
+      100% { transform: translateY(-110vh) rotate(-38deg); opacity: 0;   }
+    }
+
+    /* Confetti: tumble and drift */
+    @keyframes wcConf {
+      0%   { transform: translateY(0)      translateX(0px)   rotate(0deg);   opacity: 0;   }
+      7%   {                                                                  opacity: 1;   }
+      30%  { transform: translateY(-30vh)  translateX(40px)  rotate(180deg); }
+      60%  { transform: translateY(-60vh)  translateX(-30px) rotate(400deg); }
+      93%  {                                                                  opacity: 1;   }
+      100% { transform: translateY(-110vh) translateX(20px)  rotate(600deg); opacity: 0;   }
+    }
+
+    /* ---- World Cup toggle button — in-header, Geocities-maximalist ---- */
+    #wc-toggle {
+      /* No fixed positioning — lives in the header flow */
+      background: linear-gradient(180deg, #55DDFF 0%, #0099CC 100%);
+      border: 3px outset #99EEFF;
+      border-radius: 0;
+      box-shadow: 2px 2px 0 #003355;
+
+      color: #001133;
+      font-family: 'Arial Black', 'Arial Bold', Impact, sans-serif;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 5px 10px;
+      user-select: none;
+      white-space: nowrap;
+
+      /* Steady subtle pulse to draw the eye even when off */
+      animation: wcBtnPulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes wcBtnPulse {
+      0%, 100% { filter: brightness(1);    }
+      50%       { filter: brightness(1.12); }
+    }
+
+    #wc-toggle:hover { filter: brightness(1.15) !important; }
+
+    #wc-toggle:active {
+      border-style: inset;
+      transform: translate(1px, 1px);
+      box-shadow: 1px 1px 0 #003355;
+    }
+
+    /* Active state: rainbow border cycling — full Geocities chaos */
+    #wc-toggle.wc-on {
+      background: linear-gradient(180deg, #FFE500 0%, #FF8C00 100%);
+      color: #3A0000;
+      box-shadow: 2px 2px 0 #550000;
+      animation: wcBtnRainbow 1.2s linear infinite;
+    }
+
+    @keyframes wcBtnRainbow {
+      0%   { border-color: #FF4444; box-shadow: 2px 2px 0 #880000; }
+      14%  { border-color: #FF9900; box-shadow: 2px 2px 0 #884400; }
+      28%  { border-color: #FFE500; box-shadow: 2px 2px 0 #886600; }
+      42%  { border-color: #44DD44; box-shadow: 2px 2px 0 #007700; }
+      57%  { border-color: #44AAFF; box-shadow: 2px 2px 0 #003388; }
+      71%  { border-color: #CC44FF; box-shadow: 2px 2px 0 #440088; }
+      85%  { border-color: #FF44BB; box-shadow: 2px 2px 0 #880044; }
+      100% { border-color: #FF4444; box-shadow: 2px 2px 0 #880000; }
+    }
+
+    /* Demo banner */
+    #demo-banner {
+      background: #001144;
+      color: #55DDFF;
+      font-family: 'Arial Black', Impact, sans-serif;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-align: center;
+      padding: 5px 0;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="demo-banner">⚠ PROTOTYPE — World Cup Mode Demo — not the live site ⚠</div>
+  <div id="wc-overlay"></div>
+
+  <header>
+    <div class="logo">
+      <img src="njt-delay-tracker-logo.svg" alt="NJT Delay Tracker">
+    </div>
+
+    <!-- Right side: Bluesky icon, then WC toggle directly below it -->
+    <div class="header-right">
+      <nav class="social-icons">
+        <a href="https://bsky.app/profile/njtdelaytracker.bsky.social" aria-label="Bluesky" title="Follow on Bluesky">
+          <svg viewBox="0 0 600 530" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M135.72 44.03C202.22 93.87 273.72 195.17 300 249.57c26.28-54.4 97.78-155.7 164.28-205.54C528.08-5.57 600-28.93 600 62.33c0 18.14-10.4 152.43-16.5 174.13-21.2 75.37-98.47 94.6-166.87 82.93 119.47 20.4 149.87 87.93 84.2 155.47-124.87 128.53-179.6-32.2-193.57-73.37-2.54-7.5-3.73-11-7.27-11s-4.73 3.5-7.27 11c-13.97 41.17-68.7 201.9-193.57 73.37-65.67-67.54-35.27-135.07 84.2-155.47-68.4 11.67-145.67-7.56-166.87-82.93C10.4 214.76 0 80.47 0 62.33 0-28.93 71.92-5.57 135.72 44.03Z"/>
+          </svg>
+        </a>
+      </nav>
+
+      <button id="wc-toggle">⚽ World Cup Mode</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero-block">
+      <p class="hero-lede">Every day New Jersey Transit runs late, and every day New Jersey commuters and New York City employers absorb the cost. Here&rsquo;s how much.</p>
+
+      <p class="figure-label">Most recently, New Jersey Transit delays cost commuters and New York City employers more than:</p>
+      <p class="figure-primary">$742,040</p>
+      <p class="figure-caption">in productive time, based on <strong>30,918</strong> total hours of delays.</p>
+
+      <p class="figure-label">Since we started tracking in April 2026, New Jersey Transit delays have cost commuters and employers more than:</p>
+      <p class="figure-secondary">$12,400,000</p>
+      <p class="figure-caption-secondary">in productive time spent waiting for missed, canceled, or delayed trains.</p>
+
+      <p class="body-text">
+        Every Tuesday through Saturday, we collect New Jersey Transit service alerts and estimate
+        the economic cost of those delays, using a methodology that draws on NJT ridership and
+        New Jersey economic data.
+      </p>
+      <p class="body-text">
+        Fixing New Jersey Transit will be expensive, but letting it slowly get worse, day by day, will cost more.
+      </p>
+    </div>
+  </main>
+
+  <footer>
+    <nav class="footer-nav">
+      <a href="methodology.html">Methodology</a>
+      <a href="graphs.html">Data and Trends</a>
+      <a href="mailto:bettertrains@proton.me">Contact Us</a>
+    </nav>
+    <p class="footer-text">NJT / Delay Tracker is a project of BetterTrains.org.</p>
+    <p class="footer-text">This site is not affiliated with New Jersey Transit in any way.</p>
+    <p class="footer-kofi">If you find this project useful, please consider <a href="https://ko-fi.com/bettertrains" target="_blank" rel="noopener">buying me a coffee</a> to keep it running.</p>
+  </footer>
+
+  <script>
+    // ================================================================
+    // PIXEL ART SPRITES
+    // 0=transparent  1=black  2=white  3=yellow  4=orange
+    // ================================================================
+
+    const PAL = {
+      1: '#111111',
+      2: '#F4F4F4',
+      3: '#FFD000',
+      4: '#E8650A',
+    };
+
+    // Soccer ball — 12 × 12 px
+    // Adidas Telstar hexagon patch layout
+    const BALL = [
+      [0,0,0,1,1,1,1,1,1,0,0,0],
+      [0,0,1,2,2,2,2,2,2,1,0,0],
+      [0,1,2,2,1,2,2,1,2,2,1,0],
+      [1,2,2,1,1,2,2,1,1,2,2,1],
+      [1,2,2,2,2,2,2,2,2,2,2,1],
+      [1,2,2,2,2,2,2,2,2,2,2,1],
+      [1,2,2,2,2,2,2,2,2,2,2,1],
+      [1,2,2,1,1,2,2,1,1,2,2,1],
+      [0,1,2,2,1,2,2,1,2,2,1,0],
+      [0,1,2,2,2,2,2,2,2,2,1,0],
+      [0,0,1,2,2,2,2,2,2,1,0,0],
+      [0,0,0,1,1,1,1,1,1,0,0,0],
+    ];
+
+    // Vuvuzela — 18 × 6 px, pointing right
+    // Mouthpiece on the left, bell flare on the right
+    const VUVU = [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0],
+      [0,0,0,0,0,0,0,0,0,1,1,1,1,3,3,3,3,1],
+      [0,0,0,0,1,1,1,1,1,3,3,3,3,3,3,3,4,1],
+      [0,1,1,1,3,3,3,3,3,3,3,3,3,3,4,1,0,0],
+      [0,1,3,3,3,3,1,1,1,1,1,0,0,0,0,0,0,0],
+      [0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+    ];
+
+    // Confetti square — 4 × 4 px, rendered in one of several colors per instance
+    const CONF_TEMPLATE = [
+      [1,1,1,1],
+      [1,1,1,1],
+      [1,1,1,1],
+      [1,1,1,1],
+    ];
+
+    // World Cup / Brazil palette for confetti
+    const CONF_COLORS = ['#009C3B','#FFDF00','#002776','#FFFFFF','#E8650A','#FF2222'];
+
+    function renderSprite(pixels, scale, overrideColor) {
+      const rows = pixels.length, cols = pixels[0].length;
+      const c = document.createElement('canvas');
+      c.width  = cols * scale;
+      c.height = rows * scale;
+      const ctx = c.getContext('2d');
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const p = pixels[y][x];
+          if (!p) continue;
+          ctx.fillStyle = overrideColor || PAL[p] || '#000';
+          ctx.fillRect(x * scale, y * scale, scale, scale);
+        }
+      }
+      return c.toDataURL();
+    }
+
+    // Pre-render all sizes: scale factors 3, 4, 5, 6, 8
+    const BALL_URLS = [3, 4, 5, 6, 8].map(s => renderSprite(BALL, s));
+    const VUVU_URLS = [3, 4, 5, 6, 8].map(s => renderSprite(VUVU, s));
+
+    // ================================================================
+    // FLOATER SYSTEM
+    // ================================================================
+
+    const overlay = document.getElementById('wc-overlay');
+    const btn     = document.getElementById('wc-toggle');
+    let   wcOn    = false;
+    let   timer   = null;
+
+    // localStorage key: presence of this key means the user opted OUT.
+    // Absence (null) means default — which is ON through end of July 2026.
+    const PREF_KEY = 'njt-wc-off';
+
+    function userHasOptedOut() {
+      try { return localStorage.getItem(PREF_KEY) === '1'; }
+      catch { return false; }
+    }
+
+    function saveOptOut() {
+      try { localStorage.setItem(PREF_KEY, '1'); } catch {}
+    }
+
+    function clearOptOut() {
+      try { localStorage.removeItem(PREF_KEY); } catch {}
+    }
+
+    // Returns true if today is within the World Cup window (June 13 – July 31 2026)
+    function isWorldCupSeason() {
+      const now   = new Date();
+      const start = new Date('2026-06-13');
+      const end   = new Date('2026-08-01');   // exclusive upper bound
+      return now >= start && now < end;
+    }
+
+    function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function spawnFloater() {
+      const roll = Math.random();
+      let el, animName, dur;
+
+      if (roll < 0.45) {
+        // Soccer ball
+        el = document.createElement('img');
+        el.src = pickRandom(BALL_URLS);
+        animName = 'wcBall';
+        dur = 8 + Math.random() * 9;       // 8–17 s
+      } else if (roll < 0.75) {
+        // Vuvuzela
+        el = document.createElement('img');
+        el.src = pickRandom(VUVU_URLS);
+        animName = 'wcVuvu';
+        dur = 10 + Math.random() * 8;      // 10–18 s
+      } else {
+        // Confetti square (plain div — no canvas needed)
+        el = document.createElement('div');
+        const sz = 5 + Math.floor(Math.random() * 9);   // 5–13 px
+        el.style.width  = sz + 'px';
+        el.style.height = sz + 'px';
+        el.style.background = pickRandom(CONF_COLORS);
+        animName = 'wcConf';
+        dur = 6 + Math.random() * 8;      // 6–14 s
+      }
+
+      el.className = 'wc-floater';
+      el.style.left   = (2 + Math.random() * 94) + '%';
+      el.style.bottom = '-100px';
+      el.style.animation = `${animName} ${dur.toFixed(1)}s ease-in-out forwards`;
+
+      overlay.appendChild(el);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
+
+    function startWC() {
+      wcOn = true;
+      btn.textContent = '⚽ Turn Off';
+      btn.classList.add('wc-on');
+      btn.title = 'Turn off World Cup Mode';
+
+      // Flood the screen immediately with a wave of floaters
+      for (let i = 0; i < 18; i++) {
+        setTimeout(spawnFloater, i * 160);
+      }
+
+      // Then maintain a steady chaotic stream
+      timer = setInterval(spawnFloater, 420);
+    }
+
+    function stopWC() {
+      wcOn = false;
+      btn.textContent = '⚽ World Cup Mode';
+      btn.classList.remove('wc-on');
+      btn.title = 'Turn on World Cup Mode';
+      clearInterval(timer);
+      timer = null;
+      // Existing floaters fade out naturally via their animation
+    }
+
+    btn.addEventListener('click', () => {
+      if (wcOn) {
+        stopWC();
+        saveOptOut();       // remember: this user said no
+      } else {
+        startWC();
+        clearOptOut();      // they changed their mind — clear the opt-out
+      }
+    });
+
+    // Auto-start on load: on if it's World Cup season AND the user hasn't opted out
+    if (isWorldCupSeason() && !userHasOptedOut()) {
+      startWC();
+    }
+  </script>
+
+</body>
+</html>
