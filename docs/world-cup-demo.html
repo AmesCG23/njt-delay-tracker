@@ -113,15 +113,15 @@
       will-change: transform, opacity;
     }
 
-    /* Balls spin as they rise, swaying side to side */
+    /* Balls sway as they rise — sprite sheet handles the spin */
     @keyframes wcBall {
-      0%   { transform: translateY(0)      translateX(0px)   rotate(0deg);   opacity: 0;   }
-      7%   {                                                                  opacity: 0.92; }
-      25%  { transform: translateY(-25vh)  translateX(28px)  rotate(100deg); }
-      50%  { transform: translateY(-50vh)  translateX(-22px) rotate(200deg); }
-      75%  { transform: translateY(-75vh)  translateX(18px)  rotate(300deg); }
-      93%  {                                                                  opacity: 0.92; }
-      100% { transform: translateY(-110vh) translateX(0px)   rotate(400deg); opacity: 0;   }
+      0%   { transform: translateY(0)      translateX(0px);   opacity: 0;   }
+      7%   {                                                   opacity: 0.92; }
+      25%  { transform: translateY(-25vh)  translateX(28px);  }
+      50%  { transform: translateY(-50vh)  translateX(-22px); }
+      75%  { transform: translateY(-75vh)  translateX(18px);  }
+      93%  {                                                   opacity: 0.92; }
+      100% { transform: translateY(-110vh) translateX(0px);   opacity: 0;   }
     }
 
     /* Vuvuzelas drift up tilted, no spin */
@@ -273,41 +273,41 @@
 
   <script>
     // ================================================================
-    // PIXEL ART SPRITES
-    // 0=transparent  1=black  2=white  3=yellow  4=orange
+    // SOCCER BALL SPRITE SHEET  (mustitz/ballgen — public domain example)
+    // 1024×1024, 8 cols × 8 rows, 128×128 px per frame.
+    // Cols = horizontal rotation angle; rows = elevation angle.
+    // Row 3 gives a clean front-facing view.
     // ================================================================
+    const SHEET_COLS = 8;
+    const FRAME_PX   = 128;
+    const SPIN_ROW   = 3;
+    const BALL_SIZES = [48, 64, 80, 96];   // display sizes in px
 
-    const PAL = {
-      1: '#111111',
-      2: '#F4F4F4',
-      3: '#FFD000',
-      4: '#E8650A',
+    let BALL_FRAMES = null;   // [sizeIdx][frameIdx] → data URL, filled on load
+
+    const ballSheet = new Image();
+    ballSheet.onload = function () {
+      BALL_FRAMES = BALL_SIZES.map(sz =>
+        Array.from({ length: SHEET_COLS }, (_, col) => {
+          const c = document.createElement('canvas');
+          c.width = c.height = sz;
+          c.getContext('2d').drawImage(
+            ballSheet,
+            col * FRAME_PX, SPIN_ROW * FRAME_PX, FRAME_PX, FRAME_PX,
+            0, 0, sz, sz
+          );
+          return c.toDataURL();
+        })
+      );
     };
+    ballSheet.src = 'soccer-ball-sprite.png';
 
-    // Soccer ball — 16 × 16 px
-    // One central downward-pointing pentagon (flat top, pointed bottom)
-    // floating INSIDE the white area — not at the edges. Classic NES/
-    // Sensible-Soccer visual shorthand. Two 3×2 flank patches lower-left
-    // and lower-right, separated from the circle outline by white pixels.
-    const BALL = [
-      //  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  //  0  top arc
-          [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  //  1
-          [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  //  2
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  3  white
-          [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  4  pentagon flat top (cols 5–9)
-          [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  5  pentagon body
-          [1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1],  //  6  pentagon narrows (cols 6–8)
-          [1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1],  //  7  pentagon point (col 7)
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  8  white
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  9  white
-          [1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1],  // 10  lower-left (cols 3–5) + lower-right (cols 10–12)
-          [1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1],  // 11  patches continue (3 wide × 2 tall each)
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 12  white
-          [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  // 13
-          [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  // 14
-          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  // 15  bottom arc
-    ];
+    // ================================================================
+    // VUVUZELA PIXEL ART SPRITE  (hand-drawn, unchanged)
+    // ================================================================
+    // 0=transparent  1=black  3=yellow  4=orange
+
+    const PAL = { 1: '#111111', 3: '#FFD000', 4: '#E8650A' };
 
     // Vuvuzela — 20 × 8 px, pointing right
     // Mouthpiece (left, 2px tall) flares to a full bell (right, 8px tall).
@@ -354,8 +354,6 @@
       return c.toDataURL();
     }
 
-    // Ball: 16px base → 48/64/80/96/128px on screen
-    const BALL_URLS = [3, 4, 5, 6, 8].map(s => renderSprite(BALL, s));
     // Vuvu: 20px wide base — cap at 5× (100px wide) to keep it proportionate
     const VUVU_URLS = [2, 3, 4, 5].map(s => renderSprite(VUVU, s));
 
@@ -397,29 +395,41 @@
 
     function spawnFloater() {
       const roll = Math.random();
-      let el, animName, dur;
+      let el, animName, dur, spinInterval = null;
 
-      if (roll < 0.45) {
-        // Soccer ball
+      if (roll < 0.45 && BALL_FRAMES) {
+        // Soccer ball — spinning via sprite sheet frame cycling
+        const sizeIdx = Math.floor(Math.random() * BALL_SIZES.length);
+        const frames  = BALL_FRAMES[sizeIdx];
+        const sz      = BALL_SIZES[sizeIdx];
+        let   frame   = Math.floor(Math.random() * SHEET_COLS);
+
         el = document.createElement('img');
-        el.src = pickRandom(BALL_URLS);
+        el.width  = sz;
+        el.height = sz;
+        el.src    = frames[frame];
+        spinInterval = setInterval(() => {
+          frame = (frame + 1) % SHEET_COLS;
+          el.src = frames[frame];
+        }, 90);    // ~11 fps → one full rotation ≈ 0.7 s
+
         animName = 'wcBall';
-        dur = 8 + Math.random() * 9;       // 8–17 s
-      } else if (roll < 0.75) {
-        // Vuvuzela
+        dur = 8 + Math.random() * 9;
+      } else if (roll < 0.75 || (roll < 0.45 && !BALL_FRAMES)) {
+        // Vuvuzela (also catches ball slot when sprite not yet loaded)
         el = document.createElement('img');
         el.src = pickRandom(VUVU_URLS);
         animName = 'wcVuvu';
-        dur = 10 + Math.random() * 8;      // 10–18 s
+        dur = 10 + Math.random() * 8;
       } else {
-        // Confetti square (plain div — no canvas needed)
+        // Confetti square
         el = document.createElement('div');
-        const sz = 5 + Math.floor(Math.random() * 9);   // 5–13 px
+        const sz = 5 + Math.floor(Math.random() * 9);
         el.style.width  = sz + 'px';
         el.style.height = sz + 'px';
         el.style.background = pickRandom(CONF_COLORS);
         animName = 'wcConf';
-        dur = 6 + Math.random() * 8;      // 6–14 s
+        dur = 6 + Math.random() * 8;
       }
 
       el.className = 'wc-floater';
@@ -428,7 +438,10 @@
       el.style.animation = `${animName} ${dur.toFixed(1)}s ease-in-out forwards`;
 
       overlay.appendChild(el);
-      el.addEventListener('animationend', () => el.remove(), { once: true });
+      el.addEventListener('animationend', () => {
+        if (spinInterval) clearInterval(spinInterval);
+        el.remove();
+      }, { once: true });
     }
 
     function startWC() {
@@ -437,13 +450,10 @@
       btn.classList.add('wc-on');
       btn.title = 'Turn off World Cup Mode';
 
-      // Flood the screen immediately with a wave of floaters
-      for (let i = 0; i < 18; i++) {
-        setTimeout(spawnFloater, i * 160);
-      }
-
-      // Then maintain a steady chaotic stream
-      timer = setInterval(spawnFloater, 420);
+      // Initial wave of floaters
+      for (let i = 0; i < 10; i++) setTimeout(spawnFloater, i * 220);
+      // Steady stream
+      timer = setInterval(spawnFloater, 750);
     }
 
     function stopWC() {
