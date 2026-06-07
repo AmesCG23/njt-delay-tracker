@@ -284,29 +284,34 @@
       4: '#E8650A',
     };
 
-    // Soccer ball — 16 × 16 px
-    // One central downward-pointing pentagon (flat top, pointed bottom)
-    // floating INSIDE the white area — not at the edges. Classic NES/
-    // Sensible-Soccer visual shorthand. Two 3×2 flank patches lower-left
-    // and lower-right, separated from the circle outline by white pixels.
+    // Soccer ball — 16 × 16 px  (Telstar-style)
+    //
+    // One large central pentagon (flat top, pointed bottom) plus 5 partial
+    // pentagons at the ball's edge, positioned at the 5 points of a larger
+    // imaginary pentagon:
+    //   top (12 o'clock)  — row 1, cols 5-10
+    //   upper-left  (~10) — rows 3-5, cols 1-2, bleeding into circle outline
+    //   upper-right (~2)  — rows 3-5, cols 13-14
+    //   lower-left  (~8)  — rows 10-12, cols 1-3
+    //   lower-right (~4)  — rows 10-12, cols 12-14
     const BALL = [
       //  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  //  0  top arc
-          [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  //  1
-          [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  //  2
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  3  white
-          [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  4  pentagon flat top (cols 5–9)
-          [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  5  pentagon body
-          [1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1],  //  6  pentagon narrows (cols 6–8)
-          [1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1],  //  7  pentagon point (col 7)
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  8  white
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  9  white
-          [1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1],  // 10  lower-left (cols 3–5) + lower-right (cols 10–12)
-          [1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 2, 2, 1],  // 11  patches continue (3 wide × 2 tall each)
-          [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  // 12  white
-          [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  // 13
-          [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  // 14
-          [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  // 15  bottom arc
+      [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  //  0  top arc
+      [0, 0, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0],  //  1  top patch (cols 5-10)
+      [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  //  2  white gap
+      [1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1],  //  3  UL(1-2)+gap+cent-top(5-10)+gap+UR(13-14)
+      [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1],  //  4  UL(1-2)+gap+cent-wide(4-11)+gap+UR(13-14)
+      [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1],  //  5  same
+      [1, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1],  //  6  central 6-wide (5-10)
+      [1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1],  //  7  central 4-wide (6-9)
+      [1, 2, 2, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 1],  //  8  central 2-wide point (7-8)
+      [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],  //  9  white gap
+      [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1],  // 10  LL(1-3) + LR(12-14)
+      [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1],  // 11  same
+      [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1],  // 12  same
+      [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],  // 13
+      [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0],  // 14
+      [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],  // 15  bottom arc
     ];
 
     // Vuvuzela — 20 × 8 px, pointing right
@@ -437,13 +442,13 @@
       btn.classList.add('wc-on');
       btn.title = 'Turn off World Cup Mode';
 
-      // Flood the screen immediately with a wave of floaters
-      for (let i = 0; i < 18; i++) {
-        setTimeout(spawnFloater, i * 160);
+      // Initial wave of floaters
+      for (let i = 0; i < 10; i++) {
+        setTimeout(spawnFloater, i * 220);
       }
 
-      // Then maintain a steady chaotic stream
-      timer = setInterval(spawnFloater, 420);
+      // Steady stream
+      timer = setInterval(spawnFloater, 750);
     }
 
     function stopWC() {
