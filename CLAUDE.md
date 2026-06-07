@@ -697,11 +697,52 @@ A seasonal Easter egg active June 13 – July 31, 2026 (2026 FIFA World Cup, hos
 `docs/soccer-ball-sprite.png` — 1024×1024, 8 cols × 8 rows, 128×128px per frame. Source: mustitz/ballgen project (public domain example). Frames are pre-extracted into `BALL_FRAMES[sizeIdx][frameIdx]` as canvas data URLs on page load. The spin interval is cleared via `animationend` listener.
 
 ### How to remove World Cup Mode entirely
-The code in `index.html` is split into four marked blocks. Delete all four:
-1. **CSS block** — search for `WORLD CUP MODE CSS` in `<style>`
-2. **Overlay div** — `<div id="wc-overlay">` just after `<body>`
-3. **Header change** — the `.header-right` wrapper div and `<button id="wc-toggle">`; restore `<nav class="social-icons">` as a direct child of `<header>`
-4. **Script block** — search for `WORLD CUP MODE SCRIPT` near `</body>`
+
+The code in `docs/index.html` is split into four clearly commented blocks. Remove all four and the page will be exactly as it was before. Each block is bounded by matching open/close comments so you can find them with a text search.
+
+**Step 1 — CSS block** (inside `<style>`, ~110 lines)
+
+Search for: `WORLD CUP MODE CSS`  
+Delete everything from that comment down to and including `END WORLD CUP MODE CSS`.
+
+**Step 2 — Overlay div** (2 lines, just after `<body>`)
+
+Delete these three lines:
+```html
+<!-- WORLD CUP MODE: floater overlay — remove this div to excise the feature -->
+<div id="wc-overlay"></div>
+<!-- END WORLD CUP MODE overlay -->
+```
+
+**Step 3 — Header restructure** (the trickiest step)
+
+The header currently looks like:
+```html
+<!-- WORLD CUP MODE: .header-right stacks ... -->
+<div class="header-right">
+  <nav class="social-icons">
+    ...Bluesky icon...
+  </nav>
+  <button id="wc-toggle">⚽ World Cup Mode</button>
+</div>
+<!-- END WORLD CUP MODE header -->
+```
+
+Replace that entire block (from the opening comment to `END WORLD CUP MODE header`) with just:
+```html
+<nav class="social-icons">
+  ...Bluesky icon (unchanged)...
+</nav>
+```
+
+i.e. delete the `.header-right` wrapper div, the `<button id="wc-toggle">`, and both comments — leaving the `<nav class="social-icons">` as a direct child of `<header>`.
+
+**Step 4 — Script block** (~170 lines, near `</body>`)
+
+Search for: `WORLD CUP MODE SCRIPT`  
+Delete everything from that comment down to and including `END WORLD CUP MODE SCRIPT`.
+
+After all four steps: no World Cup CSS, no overlay div, header is back to its original structure, no World Cup JS. The `soccer-ball-sprite.png` asset file can also be deleted from `docs/` once the script is gone.
 
 ### History of this feature
 - Multiple pixel art soccer ball attempts before switching to the sprite sheet
