@@ -665,6 +665,51 @@ Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 ---
 
-*Last updated: May 14, 2026. Built collaboratively with Claude (Anthropic).*
+## World Cup Mode (`docs/index.html`)
+
+A seasonal Easter egg active June 13 – July 31, 2026 (2026 FIFA World Cup, hosted in USA/Canada/Mexico). Lives in `docs/index.html` — all World Cup code is clearly delimited with removal instructions in comments.
+
+**Current state (as of June 7, 2026): fully implemented and merged to `main`.**
+
+### What it does
+- Floating animated elements rise from the bottom of the screen
+- Toggle button in the header (under the Bluesky icon), Geocities-maximalist styling with rainbow border when active
+- Default ON during World Cup season unless the user has opted out; opt-out stored in `localStorage` key `njt-wc-off`
+
+### Floater types and spawn rates
+| Type | Share | Notes |
+|---|---|---|
+| Soccer ball | 30% | 3D-rendered sprite sheet (`docs/soccer-ball-sprite.png`), 8-frame spin animation at ~11fps via `setInterval`. Sizes: 40/48/56/64px |
+| Vuvuzela | 20% | Pixel art drawn in-code (20×8 VUVU array), rendered at 2–4× scale (~40–80px wide). Yellow/orange, tilts as it floats |
+| US flag 🇺🇸 | 15% | Twemoji PNG fetched from `raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f1fa-1f1f8.png`. Sizes: 40/52/64px. `image-rendering: auto` (not pixelated) |
+| Confetti | 35% | Small colored squares, 5–13px. US patriotic colors: #B22334 (red), #FFFFFF (white), #3C3B6E (blue) |
+
+### Key constants in the script
+- `BALL_SIZES = [40, 48, 56, 64]` — display px for ball frames
+- `SPIN_ROW = 3` — row in the sprite sheet used for spin animation
+- `VUVU_URLS` — pre-rendered canvases at scales 2/3/4
+- `FLAG_SRC` — Twemoji US flag URL
+- `CONF_COLORS` — red/white/blue array (red weighted 2×, blue 2×, white 2×)
+- `PREF_KEY = 'njt-wc-off'` — localStorage opt-out key
+- World Cup window: June 13 – July 31, 2026 (`isWorldCupSeason()`)
+
+### Soccer ball sprite sheet
+`docs/soccer-ball-sprite.png` — 1024×1024, 8 cols × 8 rows, 128×128px per frame. Source: mustitz/ballgen project (public domain example). Frames are pre-extracted into `BALL_FRAMES[sizeIdx][frameIdx]` as canvas data URLs on page load. The spin interval is cleared via `animationend` listener.
+
+### How to remove World Cup Mode entirely
+The code in `index.html` is split into four marked blocks. Delete all four:
+1. **CSS block** — search for `WORLD CUP MODE CSS` in `<style>`
+2. **Overlay div** — `<div id="wc-overlay">` just after `<body>`
+3. **Header change** — the `.header-right` wrapper div and `<button id="wc-toggle">`; restore `<nav class="social-icons">` as a direct child of `<header>`
+4. **Script block** — search for `WORLD CUP MODE SCRIPT` near `</body>`
+
+### History of this feature
+- Multiple pixel art soccer ball attempts before switching to the sprite sheet
+- Post-merge `ReferenceError: PAL is not defined` (dropped during branch merge) — fixed
+- Several branches: `world-cup-ball-fix`, `world-cup-ball-v3`, `world-cup-ball-sprite`, `world-cup-fix-merge`, `world-cup-flags`, `world-cup-launch` (final, merged June 2026)
+
+---
+
+*Last updated: June 7, 2026. Built collaboratively with Claude (Anthropic).*
 
 <!-- Provisional changes: Hoboken diversion detection (see "Provisional Changes Under Review") -->
