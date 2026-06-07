@@ -144,6 +144,17 @@
       100% { transform: translateY(-110vh) translateX(20px)  rotate(600deg); opacity: 0;   }
     }
 
+    /* US Flag: gentle flutter as it rises */
+    @keyframes wcFlag {
+      0%   { transform: translateY(0)      translateX(0px)   rotate(0deg);  opacity: 0;   }
+      7%   {                                                                 opacity: 0.9; }
+      25%  { transform: translateY(-25vh)  translateX(18px)  rotate(5deg);  }
+      50%  { transform: translateY(-50vh)  translateX(-12px) rotate(-3deg); }
+      75%  { transform: translateY(-75vh)  translateX(15px)  rotate(4deg);  }
+      93%  {                                                                 opacity: 0.9; }
+      100% { transform: translateY(-110vh) translateX(0px)   rotate(0deg);  opacity: 0;   }
+    }
+
     /* ---- World Cup toggle button — in-header, Geocities-maximalist ---- */
     #wc-toggle {
       /* No fixed positioning — lives in the header flow */
@@ -281,7 +292,7 @@
     const SHEET_COLS = 8;
     const FRAME_PX   = 128;
     const SPIN_ROW   = 3;
-    const BALL_SIZES = [48, 64, 80, 96];   // display sizes in px
+    const BALL_SIZES = [40, 48, 56, 64];   // display sizes in px
 
     let BALL_FRAMES = null;   // [sizeIdx][frameIdx] → data URL, filled on load
 
@@ -301,6 +312,10 @@
       );
     };
     ballSheet.src = 'soccer-ball-sprite.png';
+
+    // US flag emoji — Twemoji, public domain CC0
+    const FLAG_SRC   = 'https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f1fa-1f1f8.png';
+    const FLAG_SIZES = [40, 52, 64];
 
     // Palette for vuvuzela pixel art (0=transparent, 1=black, 3=yellow, 4=orange)
     const PAL = { 1: '#111111', 3: '#FFD000', 4: '#E8650A' };
@@ -322,8 +337,8 @@
           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],  // r7 bell bottom
     ];
 
-    // World Cup / Brazil palette for confetti
-    const CONF_COLORS = ['#009C3B','#FFDF00','#002776','#FFFFFF','#E8650A','#FF2222'];
+    // US patriotic palette for confetti
+    const CONF_COLORS = ['#B22334','#FFFFFF','#3C3B6E','#B22334','#FFFFFF','#3C3B6E'];
 
     function renderSprite(pixels, scale, overrideColor) {
       const rows = pixels.length, cols = pixels[0].length;
@@ -342,8 +357,8 @@
       return c.toDataURL();
     }
 
-    // Vuvu: 20px wide base — cap at 5× (100px wide) to keep it proportionate
-    const VUVU_URLS = [2, 3, 4, 5].map(s => renderSprite(VUVU, s));
+    // Vuvu: 20px wide base — cap at 4× (80px wide) to keep it proportionate
+    const VUVU_URLS = [2, 3, 4].map(s => renderSprite(VUVU, s));
 
     // ================================================================
     // FLOATER SYSTEM
@@ -385,7 +400,7 @@
       const roll = Math.random();
       let el, animName, dur, spinInterval = null;
 
-      if (roll < 0.45 && BALL_FRAMES) {
+      if (roll < 0.30 && BALL_FRAMES) {
         // Soccer ball — spinning via sprite sheet frame cycling
         const sizeIdx = Math.floor(Math.random() * BALL_SIZES.length);
         const frames  = BALL_FRAMES[sizeIdx];
@@ -403,14 +418,24 @@
 
         animName = 'wcBall';
         dur = 8 + Math.random() * 9;
-      } else if (roll < 0.75 || (roll < 0.45 && !BALL_FRAMES)) {
+      } else if (roll < 0.50 || (roll < 0.30 && !BALL_FRAMES)) {
         // Vuvuzela (also catches ball slot when sprite not yet loaded)
         el = document.createElement('img');
         el.src = pickRandom(VUVU_URLS);
         animName = 'wcVuvu';
         dur = 10 + Math.random() * 8;
+      } else if (roll < 0.65) {
+        // US Flag — flutter as it rises
+        el = document.createElement('img');
+        const sz = pickRandom(FLAG_SIZES);
+        el.width  = sz;
+        el.height = sz;
+        el.src    = FLAG_SRC;
+        el.style.imageRendering = 'auto';
+        animName = 'wcFlag';
+        dur = 9 + Math.random() * 8;
       } else {
-        // Confetti square
+        // Confetti square — 35% of spawns
         el = document.createElement('div');
         const sz = 5 + Math.floor(Math.random() * 9);
         el.style.width  = sz + 'px';
