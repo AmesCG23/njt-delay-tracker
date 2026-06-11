@@ -1,0 +1,75 @@
+# special_event.yml — On-demand special event scraper
+#
+# Manual dispatch only — no scheduled crons.
+#
+# Scrapes any stated time window, logs results to Special_Event_Log and
+# Special_Event_Tweet_log tabs, and posts to Bluesky. Completely isolated
+# from the daily pipeline: never writes to Event Log, Tweet_log, or for_web,
+# and does not affect the website's running total.
+#
+# Required inputs:
+#   window_start   — start of the monitoring window (ET, YYYY-MM-DD HH:MM)
+#   window_end     — end of the monitoring window   (ET, YYYY-MM-DD HH:MM)
+#   event_name     — short label for logs and the auto-generated tweet
+#                    e.g. "the PATH Hudson Tunnel closure" or "Super Bowl LXI"
+#
+# Optional inputs:
+#   tweet_text     — if provided, this text is posted verbatim on Bluesky
+#                    instead of the auto-generated summary. Delay stats are
+#                    still calculated and logged regardless.
+#   dry_run        — set to "false" to write to Sheets and post the tweet
+
+name: NJT Special Event Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      window_start:
+        description: "Window start, Eastern Time (YYYY-MM-DD HH:MM)"
+        required: true
+      window_end:
+        description: "Window end, Eastern Time (YYYY-MM-DD HH:MM)"
+        required: true
+      event_name:
+        description: "Event label for logs and tweet (e.g. 'the PATH tunnel closure')"
+        required: true
+      tweet_text:
+        description: "Tweet to post verbatim (leave blank to auto-generate from stats)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no Sheets, no tweet)?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  special-event-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Run special event pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          WINDOW_START_ET: ${{ github.event.inputs.window_start }}
+          WINDOW_END_ET: ${{ github.event.inputs.window_end }}
+          EVENT_NAME: ${{ github.event.inputs.event_name }}
+          TWEET_TEXT: ${{ github.event.inputs.tweet_text }}
+        run: |
+          echo "DRY_RUN=$DRY_RUN"
+          echo "WINDOW_START_ET=$WINDOW_START_ET"
+          echo "WINDOW_END_ET=$WINDOW_END_ET"
+          echo "EVENT_NAME=$EVENT_NAME"
+          python src/special_event.py
