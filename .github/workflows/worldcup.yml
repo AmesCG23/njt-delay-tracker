@@ -1,0 +1,86 @@
+# worldcup.yml — World Cup game-day scraper
+#
+# Fires once per FIFA World Cup 2026 match at MetLife Stadium.
+# Each cron runs 30 minutes after the 12-hour monitoring window closes
+# (kickoff − 3 h through kickoff + 9 h, Eastern Time).
+#
+# All times are UTC. Games are in EDT (UTC−4).
+#
+# Game              Kickoff ET   Window ends ET   Window ends UTC  Cron fires UTC
+# ─────────────────────────────────────────────────────────────────────────────
+# Jun 13 BRA-MAR    18:00        03:00 Jun 14     07:00 Jun 14     07:30 Jun 14
+# Jun 16 FRA-SEN    15:00        00:00 Jun 17     04:00 Jun 17     04:30 Jun 17
+# Jun 22 NOR-SEN    20:00        05:00 Jun 23     09:00 Jun 23     09:30 Jun 23
+# Jun 25 ECU-GER    16:00        01:00 Jun 26     05:00 Jun 26     05:30 Jun 26
+# Jun 27 PAN-ENG    17:00        02:00 Jun 28     06:00 Jun 28     06:30 Jun 28
+# Jun 30 R32        17:00        02:00 Jul 01     06:00 Jul 01     06:30 Jul 01
+# Jul 05 R16        16:00        01:00 Jul 06     05:00 Jul 06     05:30 Jul 06
+# Jul 19 Final      15:00        00:00 Jul 20     04:00 Jul 20     04:30 Jul 20
+#
+# The script auto-detects which game to process by finding the game whose
+# window closed within the last 2 hours.
+#
+# Manual dispatch: fill in game_date + kickoff_time_et to override detection.
+# Use this for reruns and for knockout rounds once opponents are confirmed.
+
+name: NJT World Cup Pipeline
+
+on:
+  schedule:
+    - cron: "30 7 14 6 *"   # Jun 13 — Brazil vs Morocco
+    - cron: "30 4 17 6 *"   # Jun 16 — France vs Senegal
+    - cron: "30 9 23 6 *"   # Jun 22 — Norway vs Senegal
+    - cron: "30 5 26 6 *"   # Jun 25 — Ecuador vs Germany
+    - cron: "30 6 28 6 *"   # Jun 27 — Panama vs England
+    - cron: "30 6 1 7 *"    # Jun 30 — Round of 32
+    - cron: "30 5 6 7 *"    # Jul 05 — Round of 16
+    - cron: "30 4 20 7 *"   # Jul 19 — Final
+  workflow_dispatch:
+    inputs:
+      game_date:
+        description: "Game date (YYYY-MM-DD)"
+        required: false
+        default: ""
+      kickoff_time_et:
+        description: "Kickoff time in ET, 24-hour (HH:MM)"
+        required: false
+        default: ""
+      game_label:
+        description: "Match description, e.g. 'Brazil vs Morocco'"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no Sheets, no tweet)?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  worldcup-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Run World Cup pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD: ${{ secrets.BLUESKY_PASSWORD }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          OVERRIDE_DATE: ${{ github.event.inputs.game_date || '' }}
+          OVERRIDE_KICKOFF: ${{ github.event.inputs.kickoff_time_et || '' }}
+          OVERRIDE_LABEL: ${{ github.event.inputs.game_label || '' }}
+        run: |
+          echo "DRY_RUN=$DRY_RUN"
+          echo "OVERRIDE_DATE=$OVERRIDE_DATE"
+          echo "OVERRIDE_KICKOFF=$OVERRIDE_KICKOFF"
+          echo "OVERRIDE_LABEL=$OVERRIDE_LABEL"
+          python src/worldcup.py

@@ -475,3 +475,189 @@ def log_alert_batch(interpreted_events):
     except Exception as e:
         print(f"[LOGGER] Could not write to Alert Log: {e}")
         raise
+
+
+# ── World Cup tabs ────────────────────────────────────────────────────────────
+WC_EVENT_LOG_TAB = "WC_Event_Log"
+WC_TWEET_LOG_TAB = "WC_Tweet_log"
+
+WC_EVENT_LOG_HEADERS = [
+    "Date", "Time", "Line", "Train #", "Direction", "Time Band",
+    "Delay Minutes", "Estimated Riders", "Dollar Estimate", "Cause",
+    "Is Cancellation", "Raw Alert Text", "Posted to Bluesky", "Game",
+]
+
+WC_TWEET_LOG_HEADERS = [
+    "Timestamp", "Game Label", "Game Date", "Tweet Text",
+    "Total Cost", "Event Count", "Post URI", "Person-Hours",
+]
+
+
+def log_delay_batch_worldcup(delay_list, game_label=""):
+    """
+    Write delay events to the WC_Event_Log tab in one API call.
+    Same 13-column schema as Event Log, plus a Game column (col N).
+    Never touches Event Log or the website's running total.
+    """
+    if not delay_list:
+        return
+
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        try:
+            wc_tab = spreadsheet.worksheet(WC_EVENT_LOG_TAB)
+        except gspread.WorksheetNotFound:
+            wc_tab = spreadsheet.add_worksheet(WC_EVENT_LOG_TAB, rows=500, cols=14)
+
+        if wc_tab.row_values(1) != WC_EVENT_LOG_HEADERS:
+            wc_tab.update("A1", [WC_EVENT_LOG_HEADERS])
+
+        rows = [_build_event_row(d) + [game_label] for d in delay_list]
+        wc_tab.append_rows(rows, value_input_option="USER_ENTERED")
+        print(f"[LOGGER] Wrote {len(rows)} event(s) to {WC_EVENT_LOG_TAB}.")
+
+    except Exception as e:
+        print(f"[LOGGER] {WC_EVENT_LOG_TAB} write error: {e}")
+        raise
+
+
+def log_worldcup_tweet(text, total_cost, event_count, uri=None,
+                       person_hours=0, game_label="", game_date=None):
+    """
+    Append a World Cup game-day summary to the WC_Tweet_log tab.
+    Never touches Tweet_log or for_web — website totals are unaffected.
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        try:
+            wc_tweet_tab = spreadsheet.worksheet(WC_TWEET_LOG_TAB)
+        except gspread.WorksheetNotFound:
+            wc_tweet_tab = spreadsheet.add_worksheet(WC_TWEET_LOG_TAB, rows=50, cols=8)
+
+        if wc_tweet_tab.row_values(1) != WC_TWEET_LOG_HEADERS:
+            wc_tweet_tab.update("A1", [WC_TWEET_LOG_HEADERS])
+
+        row = [
+            datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S"),  # A: Timestamp
+            game_label,                                         # B: Game Label
+            game_date or "",                                    # C: Game Date
+            text,                                               # D: Tweet Text
+            f"${total_cost:,.2f}",                             # E: Total Cost
+            event_count,                                        # F: Event Count
+            uri or "",                                          # G: Post URI
+            round(person_hours) if person_hours else "",        # H: Person-Hours
+        ]
+        wc_tweet_tab.append_row(row, value_input_option="USER_ENTERED")
+        print(f"[LOGGER] World Cup tweet logged to {WC_TWEET_LOG_TAB}.")
+
+    except Exception as e:
+        print(f"[LOGGER] {WC_TWEET_LOG_TAB} write failed: {e}")
+        raise
+
+
+# ── Special Event tabs ────────────────────────────────────────────────────────
+SE_EVENT_LOG_TAB   = "Special_Event_Log"
+SE_TWEET_LOG_TAB   = "Special_Event_Tweet_log"
+
+SE_EVENT_LOG_HEADERS = [
+    "Date", "Time", "Line", "Train #", "Direction", "Time Band",
+    "Delay Minutes", "Estimated Riders", "Dollar Estimate", "Cause",
+    "Is Cancellation", "Raw Alert Text", "Posted to Bluesky", "Event",
+]
+
+SE_TWEET_LOG_HEADERS = [
+    "Timestamp", "Event Name", "Window Start (ET)", "Window End (ET)",
+    "Tweet Text", "Custom Tweet", "Total Cost", "Event Count",
+    "Post URI", "Person-Hours",
+]
+
+
+def log_delay_batch_special_event(delay_list, event_name=""):
+    """
+    Write delay events to the Special_Event_Log tab in one API call.
+    Same 13-column schema as Event Log, plus an Event column (col N).
+    Never touches Event Log or the website's running total.
+    """
+    if not delay_list:
+        return
+
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        try:
+            se_tab = spreadsheet.worksheet(SE_EVENT_LOG_TAB)
+        except gspread.WorksheetNotFound:
+            se_tab = spreadsheet.add_worksheet(SE_EVENT_LOG_TAB, rows=500, cols=14)
+
+        if se_tab.row_values(1) != SE_EVENT_LOG_HEADERS:
+            se_tab.update("A1", [SE_EVENT_LOG_HEADERS])
+
+        rows = [_build_event_row(d) + [event_name] for d in delay_list]
+        se_tab.append_rows(rows, value_input_option="USER_ENTERED")
+        print(f"[LOGGER] Wrote {len(rows)} event(s) to {SE_EVENT_LOG_TAB}.")
+
+    except Exception as e:
+        print(f"[LOGGER] {SE_EVENT_LOG_TAB} write error: {e}")
+        raise
+
+
+def log_special_event_tweet(text, total_cost, event_count, uri=None,
+                             person_hours=0, event_name="",
+                             window_start="", window_end="",
+                             tweet_was_custom=False):
+    """
+    Append a special event summary to the Special_Event_Tweet_log tab.
+    Accumulates across events — never wiped.
+    Never touches Tweet_log or for_web.
+    """
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID not set.")
+
+    try:
+        client = get_sheet_client()
+        spreadsheet = client.open_by_key(sheet_id)
+
+        try:
+            se_tweet_tab = spreadsheet.worksheet(SE_TWEET_LOG_TAB)
+        except gspread.WorksheetNotFound:
+            se_tweet_tab = spreadsheet.add_worksheet(SE_TWEET_LOG_TAB, rows=100, cols=10)
+
+        if se_tweet_tab.row_values(1) != SE_TWEET_LOG_HEADERS:
+            se_tweet_tab.update("A1", [SE_TWEET_LOG_HEADERS])
+
+        row = [
+            datetime.now(_ET).strftime("%Y-%m-%d %H:%M:%S"),  # A: Timestamp
+            event_name,                                         # B: Event Name
+            window_start,                                       # C: Window Start (ET)
+            window_end,                                         # D: Window End (ET)
+            text,                                               # E: Tweet Text
+            "Yes" if tweet_was_custom else "No",               # F: Custom Tweet
+            f"${total_cost:,.2f}",                             # G: Total Cost
+            event_count,                                        # H: Event Count
+            uri or "",                                          # I: Post URI
+            round(person_hours) if person_hours else "",        # J: Person-Hours
+        ]
+        se_tweet_tab.append_row(row, value_input_option="USER_ENTERED")
+        print(f"[LOGGER] Special event tweet logged to {SE_TWEET_LOG_TAB}.")
+
+    except Exception as e:
+        print(f"[LOGGER] {SE_TWEET_LOG_TAB} write failed: {e}")
+        raise
