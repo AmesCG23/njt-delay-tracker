@@ -413,7 +413,7 @@
     <div class="stat-row" id="stat-row">
       <div class="stat-card">
         <div class="stat-value" id="stat-daily">$&mdash;</div>
-        <div class="stat-label">Yesterday&rsquo;s delay cost</div>
+        <div class="stat-label" id="stat-daily-label">Yesterday&rsquo;s delay cost</div>
       </div>
       <div class="stat-card">
         <div class="stat-value" id="stat-cumulative">$&mdash;</div>
@@ -421,7 +421,7 @@
       </div>
       <div class="stat-card">
         <div class="stat-value" id="stat-hours">&mdash;</div>
-        <div class="stat-label">Person-hours lost yesterday</div>
+        <div class="stat-label" id="stat-hours-label">Person-hours lost yesterday</div>
       </div>
     </div>
 
@@ -542,6 +542,15 @@
       return Math.round(num).toLocaleString('en-US');
     }
 
+    function formatReportWeekday(raw) {
+      // raw is YYYY-MM-DD; parse as local date to avoid UTC-shift issues
+      const parts = String(raw).trim().split('-');
+      if (parts.length !== 3) return null;
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+
     fetch(csvUrl)
       .then(res => { if (!res.ok) throw new Error(res.status); return res.text(); })
       .then(csv => {
@@ -549,6 +558,14 @@
         document.getElementById('stat-daily').textContent       = formatDollars(rows[0] || '');
         document.getElementById('stat-cumulative').textContent  = formatDollars(rows[1] || '');
         document.getElementById('stat-hours').textContent       = formatInteger(rows[2] || '');
+
+        // A4 = report date; use it so the label says "Monday's delay cost"
+        // instead of "Yesterday's" on days like Tuesday, when "yesterday" is wrong.
+        const weekday = formatReportWeekday(rows[3] || '');
+        if (weekday) {
+          document.getElementById('stat-daily-label').textContent = weekday + '’s delay cost';
+          document.getElementById('stat-hours-label').textContent = 'Person-hours lost ' + weekday;
+        }
 
         // A6 = morning cumulative, A7 = evening cumulative (rows index 5 and 6)
         const morning = parseFloat((rows[5] || '').replace(/[,$"\s]/g, '')) || 0;
