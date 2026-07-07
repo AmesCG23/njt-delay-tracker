@@ -18,7 +18,9 @@
 # Jul 19 Final      15:00        00:00 Jul 20     04:00 Jul 20     04:30 Jul 20
 #
 # The script auto-detects which game to process by finding the game whose
-# window closed within the last 2 hours.
+# window closed within the last 12 hours. (The grace was originally 2 hours,
+# but GitHub cron delays of 3–5 hours silently missed every group-stage
+# game — runs exited "success" having found no active game.)
 #
 # Manual dispatch: fill in game_date + kickoff_time_et to override detection.
 # Use this for reruns and for knockout rounds once opponents are confirmed.
