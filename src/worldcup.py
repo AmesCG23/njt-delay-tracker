@@ -36,6 +36,13 @@ from logger import log_delay_batch_worldcup, log_worldcup_tweet
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
 
+# How long after a game window closes the scheduled run can still detect it.
+# GitHub Actions cron is best-effort: every group-stage run in June 2026
+# started 2h49m–4h49m late, which silently missed all six games under the
+# original 2-hour grace. MetLife games are at least 48 hours apart, so a
+# 12-hour lookback can never match more than one game.
+DETECTION_GRACE = timedelta(hours=12)
+
 RESOLUTION_PHRASES = [
     "on or close to schedule",
     "normal service",
@@ -83,17 +90,20 @@ def get_game_window(game_date_str, kickoff_et_str):
 
 def find_active_game():
     """
-    For scheduled runs: return the game whose window closed within the last 2 hours.
+    For scheduled runs: return the game whose window closed within the last
+    DETECTION_GRACE (12 hours).
 
     The crons in worldcup.yml are timed 30 minutes after each window closes,
-    so the target game should always be within this 2-hour grace window.
+    but GitHub queue delays of several hours are normal — the wide grace
+    absorbs them. Games are far enough apart that at most one window can
+    have closed within the grace period.
     Returns None if no match is found — the script will exit cleanly.
     """
     now_utc = datetime.now(timezone.utc)
     for game in METLIFE_GAMES:
         _, window_end = get_game_window(game["date"], game["kickoff_et"])
         age = now_utc - window_end
-        if timedelta(0) <= age <= timedelta(hours=2):
+        if timedelta(0) <= age <= DETECTION_GRACE:
             return game
     return None
 
@@ -306,7 +316,8 @@ def run():
     else:
         game = find_active_game()
         if game is None:
-            print("[WC] No active game found within the 2-hour detection window. Exiting.")
+            grace_hours = int(DETECTION_GRACE.total_seconds() // 3600)
+            print(f"[WC] No active game found within the {grace_hours}-hour detection window. Exiting.")
             print("[WC] For manual runs, set OVERRIDE_DATE, OVERRIDE_KICKOFF, OVERRIDE_LABEL.")
             return
         print(f"[WC] Auto-detected game: {game['label']} on {game['date']}")
