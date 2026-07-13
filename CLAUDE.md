@@ -138,6 +138,18 @@ This is the entry point. When GitHub Actions runs `python src/daily.py`, everyth
 
 ---
 
+### `src/composer.py` — The AI Post Writer
+
+On delay days, the daily post is drafted by Claude (Sonnet) instead of the fixed `format_tweet()` template. `compose_post()` reads the `Tweet_log` history (one extra read-only Sheets call), computes a fact sheet of numbers in plain Python (yesterday's cost/hours/worst line/AM-vs-PM split, plus 30-day average, all-time record, streaks, and cumulative milestones), classifies the day into a scenario, and hands Claude only the matching sample posts from `src/post_library.json` plus that fact sheet. The model phrases the numbers; it never computes them. The result is mechanically validated (length, required figures present verbatim, no hashtags/links/"person-hours").
+
+**Fail-safe by design.** If the feature flag is off, a red-line keyword is present (injury/fatality/police — see `post_library.json`), the API errors, or validation fails twice, `compose_post()` returns `None` and `daily.py` falls back to `format_tweet()`. Zero-delay days always use the fixed "Good news!" template — the composer is only consulted when `event_count > 0`. Cost: ~$0.15–0.25/month.
+
+**⟵ ROLLBACK.** Fastest: set `USE_COMPOSER=false` in `daily.yml` (no code change — posts revert to the template on the next run). Permanent: flip the `USE_COMPOSER` default in `composer.py`, or revert the composer PR. Edit voice/samples/red-lines in `src/post_library.json`. If composed posts never appear despite the flag being on, the pinned `anthropic==0.40.0` SDK may need bumping for Sonnet — the pipeline keeps posting via the template meanwhile.
+
+Note: `format_tweet()`'s wording changed from "person-hours"/"person-minutes" to "hours"/"minutes" to match the composer's house style.
+
+---
+
 ### `src/watcher.py` — The Bluesky Fetcher
 
 Connects to Bluesky's public API (no login needed for reading) and fetches posts from seven alert accounts. Filters them, classifies them, and returns a clean list of dicts.
