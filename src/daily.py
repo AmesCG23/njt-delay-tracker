@@ -44,6 +44,7 @@ from calculator import (
 )
 from aggregator import deduplicate_by_train, calculate_totals
 from logger import log_delay_batch, log_tweet, clear_run_log, log_run, log_run_summary, clear_alert_log, log_alert_batch
+from composer import compose_post
 
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
@@ -320,9 +321,9 @@ def format_tweet(yesterday_et, totals):
     line_count     = len(totals["lines_affected"])
 
     time_str = (
-        f"{totals['total_person_hours']:,} person-hours"
+        f"{totals['total_person_hours']:,} hours"
         if person_minutes >= 60_000
-        else f"{person_minutes:,} person-minutes"
+        else f"{person_minutes:,} minutes"
     )
 
     cost_str = (
@@ -440,7 +441,32 @@ def run():
           f"${totals['total_cost']:,.2f}")
 
     # ── Tweet ─────────────────────────────────────────────────────────────────
-    tweet_text = format_tweet(yesterday_et, totals)
+    #
+    # ┌─ AI-COMPOSED POST — HOW TO ROLL BACK ─────────────────────────────────┐
+    # │ On delay days the post is drafted by Claude (src/composer.py) from    │
+    # │ the spreadsheet history, then validated. On any failure it falls back │
+    # │ to the fixed template in format_tweet() just below.                   │
+    # │                                                                       │
+    # │ TO ROLL BACK if the composed posts go badly:                          │
+    # │   • FASTEST (no code change): set USE_COMPOSER=false in               │
+    # │     .github/workflows/daily.yml and re-run. Posts revert to the       │
+    # │     plain template immediately.                                       │
+    # │   • PERMANENT: flip USE_COMPOSER's default in composer.py, or revert  │
+    # │     the PR that added it. This template path is unchanged either way. │
+    # │                                                                       │
+    # │ Zero-delay days always use the fixed "Good news!" template — the      │
+    # │ composer is only consulted when there are delays to describe.         │
+    # └───────────────────────────────────────────────────────────────────────┘
+    tweet_text = None
+    if totals["event_count"] > 0:
+        try:
+            tweet_text = compose_post(
+                yesterday_et, totals, morning_totals, evening_totals, all_events
+            )
+        except Exception as e:
+            print(f"[DAILY] Composer raised — falling back to template: {e}")
+    if not tweet_text:
+        tweet_text = format_tweet(yesterday_et, totals)
 
     print(f"\n[DAILY] Tweet preview:\n{'-'*40}\n{tweet_text}\n{'-'*40}")
     print(f"[DAILY] Character count: {len(tweet_text)}")

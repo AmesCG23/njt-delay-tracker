@@ -46,6 +46,9 @@ jobs:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          # AI-composed daily post (src/composer.py). Change to "false" to
+          # instantly roll back to the fixed template — no code change needed.
+          USE_COMPOSER: "true"
         run: |
           echo "DRY_RUN=$DRY_RUN"
           python src/daily.py
