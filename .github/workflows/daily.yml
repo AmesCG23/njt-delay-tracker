@@ -59,26 +59,33 @@ jobs:
           # bettertrains.org link card on the daily Bluesky post. "false"
           # reverts to plain text posts.
           USE_LINK_CARD: "true"
+          # Bake the day's figures into the static site (src/web_stats.py):
+          # index.html/graphs.html sentinel spans, data/latest.json, and
+          # sitemap lastmod — so non-JS crawlers (search engines' first
+          # pass, AI crawlers) see real numbers. "false" freezes the baked
+          # figures at their last committed values.
+          USE_WEB_STATS: "true"
         run: |
           echo "DRY_RUN=$DRY_RUN"
           python src/daily.py
 
-      # Publish the refreshed social card (og_card.py redrew it with the
-      # live cumulative total during the pipeline run). GitHub Pages serves
-      # the committed file, so link previews pick up the new number.
-      # Skipped on dry runs; a no-op when the card is byte-identical
-      # (e.g. zero-delay days, when the cumulative total doesn't move).
-      - name: Commit refreshed social card
+      # Publish the refreshed site files: the social card (og_card.py) and
+      # the baked-in site stats (web_stats.py — static figures in
+      # index.html/graphs.html, data/latest.json, sitemap lastmod).
+      # GitHub Pages serves the committed files, so link previews and
+      # non-JS crawlers pick up the new numbers. Skipped on dry runs;
+      # a no-op if nothing in docs/ changed.
+      - name: Commit refreshed site files
         if: ${{ (github.event.inputs.dry_run || 'false') == 'false' }}
         run: |
-          if git diff --quiet -- docs/og-card.png; then
-            echo "Social card unchanged — nothing to commit."
+          if [ -z "$(git status --porcelain -- docs/)" ]; then
+            echo "Site files unchanged — nothing to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/og-card.png
-          git commit -m "Update social card with latest cumulative total"
+          git add docs/
+          git commit -m "Update site stats and social card with latest figures"
           for i in 1 2 3; do
             git push origin "HEAD:${{ github.ref_name }}" && exit 0
             echo "Push failed (attempt $i) — rebasing and retrying..."

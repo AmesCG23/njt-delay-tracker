@@ -1,0 +1,31 @@
+# NJT Delay Tracker
+
+> An independent, automated tracker of what NJ Transit commuter rail delays cost commuters and New York City employers in lost productive time. Every weekday it reads NJ Transit's own service alerts for the previous day's morning (5:00–10:30 AM ET) and evening (3:00–8:30 PM ET) rush hours, estimates the delay cost in person-hours and dollars, publishes the figures here, and posts a daily summary to Bluesky. Tracking continuously since March 31, 2026.
+
+Key facts about the methodology:
+
+- Only NJ Transit **commuter rail** delays of **10 minutes or more** during rush hours are counted. Buses and light rail are excluded.
+- Cost formula: riders per train × delay length × $44/hour. The $44/hour figure applies the USDOT value-of-travel-time method (delayed time is worth about one-third of working time) to North Jersey commuter earnings of roughly $138,000/year (~$66/hour).
+- Riders per train are modeled per line from NJ Transit ridership data obtained via OPRA (public records) and GTFS schedules — e.g. 800 riders/train on the Northeast Corridor, 400 on Morris & Essex.
+- System-wide Penn Station disruptions are modeled at 9,600 affected riders per hour, based on Regional Plan Association data.
+- All figures are **estimates of opportunity cost** — productive time lost — not cash losses, and not an official accounting.
+- This project is **not affiliated with NJ Transit** in any way.
+
+## Pages
+
+- [Home](https://bettertrains.org/): the latest day's delay cost and the running cumulative total since April 2026
+- [Data & Trends](https://bettertrains.org/graphs.html): charts of person-hours lost per day, delays by rail line, and morning vs. evening rush, with CSV export
+- [Methodology](https://bettertrains.org/methodology.html): full explanation of the data sources, ridership model, and cost calculation ([plain-markdown version](https://bettertrains.org/methodology.md))
+
+## Data
+
+- [Latest daily snapshot (JSON)](https://bettertrains.org/data/latest.json): report date, that day's cost and person-hours, and the cumulative total — refreshed every weekday
+- [Full daily history (CSV)](https://docs.google.com/spreadsheets/d/e/2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce/pub?output=csv&gid=943972512): one row per tracked day — date, total cost, person-hours, and per-line breakdowns
+
+## Elsewhere
+
+- [Bluesky bot](https://bsky.app/profile/njtdelaytracker.bsky.social): one summary post per day ([RSS feed](https://bsky.app/profile/njtdelaytracker.bsky.social/rss))
+
+## Citing this site
+
+Cite figures as "NJT Delay Tracker (bettertrains.org)" and note that they are estimates. When quoting a specific day's figure, include the report date shown alongside it. Questions and corrections: bettertrains@proton.me

@@ -48,6 +48,7 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 /
 ├── CLAUDE.md                    ← this file
 ├── README.md                    ← public-facing project description
+├── handoff.md                   ← briefing doc for marketing-strategy work (give to Claude)
 ├── requirements.txt             ← Python package list
 ├── next_steps.md                ← checklist for getting the website live (mostly done now)
 ├── assets/
@@ -59,7 +60,8 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 ├── docs/                        ← GitHub Pages root; served as the public website
 │   ├── index.html               ← main page (running totals, summary stats)
 │   ├── graphs.html              ← charts page (delay trends, by-line, morning/evening)
-│   ├── methodology.html         ← how the estimates are calculated
+│   ├── methodology.html         ← how the estimates are calculated (baked copy of methodology.md)
+│   ├── methodology.md           ← editable methodology source (rendered client-side by methodology.html)
 │   ├── 404.html                 ← custom "page delayed" error page
 │   ├── CNAME                    ← custom domain for GitHub Pages
 │   ├── njt-delay-tracker-logo.svg
@@ -67,6 +69,8 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 │   │                            ← favicon set (gold slash on ink; large sizes show "NJT /")
 │   ├── og-card.png              ← 1200×630 social sharing card (Open Graph/Twitter image)
 │   ├── site.webmanifest         ← web app manifest (points at icon-192/512)
+│   ├── llms.txt                 ← machine-readable site overview for AI crawlers
+│   ├── data/latest.json         ← daily stats snapshot, rewritten by src/web_stats.py
 │   └── robots.txt / sitemap.xml ← search engine indexing helpers
 ├── src/                         ← all Python pipeline code
 │   ├── daily.py                 ← main orchestrator — runs the full pipeline
@@ -76,7 +80,8 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 │   ├── aggregator.py            ← deduplicates events, sums totals
 │   ├── logger.py                ← writes to Google Sheets (all tabs)
 │   ├── composer.py              ← drafts the daily post with Claude Sonnet
-│   └── og_card.py               ← redraws docs/og-card.png with the live total
+│   ├── og_card.py               ← redraws docs/og-card.png with the live total
+│   └── web_stats.py             ← bakes daily figures into the static site for non-JS crawlers
 └── .github/workflows/
     ├── daily.yml                ← automated daily run, Tue–Sat at 12:30 UTC (~8:30am ET)
     └── benchmark.yml            ← manual dry-run against any historical date
@@ -178,6 +183,26 @@ Each real (non-dry-run) daily run redraws `docs/og-card.png` — the Open Graph 
 `post_to_bluesky()` attaches an `AppBskyEmbedExternal` link card pointing at bettertrains.org, using the freshly regenerated `og-card.png` as the thumbnail (uploaded as a blob each day, ~50KB). Bluesky doesn't unfurl bare URLs in API-created posts, so without this embed the daily post never links to the site. Degrades in layers: thumbnail upload fails → card without image; embed build fails → plain text post; the post itself is never at risk.
 
 **⟵ ROLLBACK.** Set `USE_LINK_CARD=false` in `daily.yml` — posts revert to plain text on the next run.
+
+---
+
+### `src/web_stats.py` — The Static Stats Baker (July 2026 SEO/AI-crawl work)
+
+Each real daily run bakes the day's figures into the static site files, so crawlers that don't run JavaScript — search engines' first-pass crawlers and nearly all AI crawlers (GPTBot, ClaudeBot, PerplexityBot) — see real numbers instead of the `$—` placeholders that the page JavaScript later replaces. `update_web_stats()` rewrites:
+
+1. **`docs/index.html`** — the hero figures and report-date sentence, between sentinel comments like `<!--WS:DAILY-->$55,123<!--/WS:DAILY-->`. **Do not remove the `WS:` sentinel comments from the HTML** — a missing sentinel makes the bake silently skip that figure (by design, not an error).
+2. **`docs/graphs.html`** — the three stat cards and their weekday labels, same sentinel mechanism.
+3. **`docs/data/latest.json`** — a machine-readable daily snapshot (report date, daily cost/hours, cumulative). Also used by index.html as a same-origin fallback when the browser's Google Sheets fetch fails. If the cumulative read fails, the previous snapshot's cumulative value is preserved rather than nulled.
+4. **`docs/sitemap.xml`** — bumps `<lastmod>` for `/` and `/graphs.html`.
+
+Daily cost and person-hours come from the totals the pipeline already computed; the cumulative total is read via og_card's `fetch_cumulative_total()` (one extra read-only Sheets call). The workflow's "Commit refreshed site files" step commits everything in `docs/` after the run, same as the social card. The browser JavaScript still fetches live values and overwrites the baked text, so human visitors always see the freshest numbers.
+
+**Fail-safe by design.** On any failure `update_web_stats()` returns `None`, the committed pages stay as they are, and the run is unaffected.
+
+**⟵ ROLLBACK.** Set `USE_WEB_STATS=false` in `daily.yml` — the baked figures freeze at their last committed values (the page JavaScript keeps updating for human visitors regardless).
+
+**Test locally, no credentials needed (point --docs at a scratch copy):**
+`python src/web_stats.py --daily 55000 --hours 1250 --date 2026-07-13 --cumulative 8412067 --docs /tmp/docs-copy`
 
 ---
 
@@ -471,6 +496,8 @@ All files are in `docs/`. Hosted on GitHub Pages from the `main` branch `docs/` 
 
 **Shared head metadata (all three pages, June 2026 website review):** every page carries a favicon set (`favicon.ico` + `favicon.svg` + `apple-touch-icon.png` + `site.webmanifest`), a meta description, a canonical URL, and Open Graph/Twitter card tags pointing at `og-card.png` (1200×630 — **auto-regenerated daily** with the live cumulative total by `src/og_card.py`; see that section). `robots.txt` and `sitemap.xml` sit at the docs root; `404.html` is the custom GitHub Pages error page. The `--ink-faint` gray was darkened `#8a8a8a` → `#6b6b6b` for WCAG AA contrast, and all pages carry a `prefers-reduced-motion` CSS block that disables animations.
 
+**SEO/AI-crawl layer (July 2026):** all three pages carry JSON-LD structured data — an Organization + WebSite + **Dataset** graph on index, the same Dataset on graphs (Google Dataset Search eligibility), and a WebPage node on methodology. `docs/llms.txt` gives AI crawlers a machine-readable overview (llmstxt.org format) with links to `methodology.md` and `data/latest.json`. index.html links the bot's Bluesky RSS feed (`rel="alternate"`). The live figures are baked into the raw HTML daily by `src/web_stats.py` (see that section) so non-JS crawlers see real numbers; sitemap `lastmod` is bumped the same way. If the Dataset JSON-LD's published-CSV URL ever changes (re-publish of the Sheet), update it in both index.html and graphs.html and in llms.txt.
+
 ### `docs/index.html` — Main Page
 
 Displays three numbers fetched live from the `for_web` tab:
@@ -488,7 +515,9 @@ const SHEET_GID    = '1868128114';    // GID of the for_web tab (visible in URL 
 
 It fetches a CSV from Google's publish-to-web endpoint, parses each row as one cell from column A, and populates the page. No server required — pure static HTML.
 
-**If the numbers show `$—`:** Either the for_web tab isn't published to web, `PUBLISHED_ID` or `SHEET_GID` is wrong, or A1/A2 is empty.
+**Fallback chain (July 2026):** if the Google Sheets fetch fails in the browser, the script tries `data/latest.json` (the snapshot committed by the daily run); if that fails too, it leaves the figures `src/web_stats.py` baked into the HTML. The visible `$—` placeholders only appear if the page has never been baked.
+
+**If the numbers show `$—` or look stale:** Either the for_web tab isn't published to web, `PUBLISHED_ID` or `SHEET_GID` is wrong, A1/A2 is empty, or (stale numbers with no console errors) the daily bake hasn't run since the problem started.
 
 ### `docs/graphs.html` — Data Visualizations
 
@@ -504,7 +533,7 @@ Uses Chart.js (loaded from CDN). Three charts:
 
 ### `docs/methodology.html` — Methodology Explainer
 
-Static HTML. No dynamic data. Update the prose here when the methodology changes (VTTS rate, ridership figures, etc.).
+**`docs/methodology.md` is the editable source of truth.** The page ships with a baked static HTML copy of the markdown inside `#methodology-content` (so non-JS crawlers can read it), then fetches `methodology.md` and re-renders it client-side with marked.js — so md edits show up for human visitors immediately even if the baked copy is stale. **When you edit `methodology.md`, regenerate the static block in `methodology.html` to match** (a one-step task for Claude). On fetch failure the baked copy stays; the page is never blanked.
 
 ---
 
@@ -515,11 +544,11 @@ Static HTML. No dynamic data. Update the prose here when the methodology changes
 **Schedule:** `cron: "30 12 * * 2-6"` — 12:30 UTC, Tuesday through Saturday (~8:30am ET)  
 **Timeout:** 15 minutes  
 **Manual trigger:** `workflow_dispatch` with a `dry_run` input (default `true`)  
-**Permissions:** `contents: write` — needed by the "Commit refreshed social card" step, which pushes the updated `docs/og-card.png` back to the branch after each real run (skipped on dry runs; no-op when the card is unchanged).
+**Permissions:** `contents: write` — needed by the "Commit refreshed site files" step, which pushes the updated `docs/` files (og-card.png plus the web_stats.py bakes: index.html, graphs.html, data/latest.json, sitemap.xml) back to the branch after each real run (skipped on dry runs; no-op when nothing in docs/ changed).
 
 Scheduled runs: `DRY_RUN=false`. Manual runs: `DRY_RUN=true` by default. You can safely click "Run workflow" in the Actions tab to test without affecting production.
 
-**Feature flags set in the workflow env (all rollback levers, no code changes):** `USE_COMPOSER` (AI-drafted post text), `USE_OG_CARD` (regenerate the social card with the live total), `USE_LINK_CARD` (attach the bettertrains.org link card to the Bluesky post).
+**Feature flags set in the workflow env (all rollback levers, no code changes):** `USE_COMPOSER` (AI-drafted post text), `USE_OG_CARD` (regenerate the social card with the live total), `USE_LINK_CARD` (attach the bettertrains.org link card to the Bluesky post), `USE_WEB_STATS` (bake daily figures into the static site for non-JS crawlers).
 
 ### `benchmark.yml` — Historical Replay
 
@@ -799,6 +828,6 @@ After all four steps: no World Cup CSS, no overlay div, header is back to its or
 
 ---
 
-*Last updated: June 7, 2026. Built collaboratively with Claude (Anthropic).*
+*Last updated: July 14, 2026. Built collaboratively with Claude (Anthropic).*
 
 <!-- Provisional changes: Hoboken diversion detection (see "Provisional Changes Under Review") -->

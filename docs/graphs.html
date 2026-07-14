@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Data Visualizations — NJT Delay Tracker</title>
-  <meta name="description" content="Charts of NJ Transit delay costs: person-hours lost per day, delays by rail line, and morning vs. evening rush — updated every weekday.">
+  <title>NJ Transit Delay Data &amp; Trends — NJT Delay Tracker</title>
+  <meta name="description" content="Charts and data on NJ Transit train delays: person-hours lost per day, delays by rail line, and morning vs. evening rush — updated every weekday.">
   <link rel="canonical" href="https://bettertrains.org/graphs.html">
 
   <!-- Icons -->
@@ -29,6 +29,43 @@
   <meta name="twitter:title" content="Data &amp; Trends — NJT Delay Tracker">
   <meta name="twitter:description" content="Charts of NJ Transit delay costs: person-hours lost per day, delays by rail line, and morning vs. evening rush — updated every weekday.">
   <meta name="twitter:image" content="https://bettertrains.org/og-card.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Dataset",
+    "@id": "https://bettertrains.org/#dataset",
+    "name": "NJ Transit Rail Delay Cost Estimates",
+    "description": "Daily estimates of the economic cost of NJ Transit commuter rail delays, in person-hours and dollars of lost productive time. Derived from NJ Transit service alerts, OPRA ridership records, and the USDOT value-of-travel-time method ($44/hour). One figure per weekday since March 31, 2026, broken down by rail line and by morning versus evening rush.",
+    "url": "https://bettertrains.org/graphs.html",
+    "keywords": ["NJ Transit", "train delays", "commuter rail", "New Jersey", "New York", "Northeast Corridor", "transit performance", "delay cost", "Penn Station"],
+    "creator": {
+      "@type": "Organization",
+      "@id": "https://bettertrains.org/#org",
+      "name": "NJT Delay Tracker",
+      "url": "https://bettertrains.org/",
+      "sameAs": ["https://bsky.app/profile/njtdelaytracker.bsky.social"]
+    },
+    "temporalCoverage": "2026-03-31/..",
+    "spatialCoverage": { "@type": "Place", "name": "New Jersey and the New York metropolitan area" },
+    "isAccessibleForFree": true,
+    "measurementTechnique": "NJ Transit service alerts parsed daily; riders per train modeled from OPRA ridership data and GTFS schedules; delay time valued at $44/hour per the USDOT value-of-travel-time guidance applied to North Jersey commuter earnings. Full methodology at https://bettertrains.org/methodology.html",
+    "distribution": [
+      {
+        "@type": "DataDownload",
+        "name": "Latest daily snapshot (JSON)",
+        "encodingFormat": "application/json",
+        "contentUrl": "https://bettertrains.org/data/latest.json"
+      },
+      {
+        "@type": "DataDownload",
+        "name": "Full daily history (CSV)",
+        "encodingFormat": "text/csv",
+        "contentUrl": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce/pub?output=csv&gid=943972512"
+      }
+    ]
+  }
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -441,22 +478,24 @@
   </header>
 
   <main>
-    <h1>Data Visualizations</h1>
+    <h1>NJ Transit Delay Data &amp; Trends</h1>
     <p class="page-sub">NJ Transit delay costs over time &mdash; by day, line, and rush hour</p>
 
-    <!-- Summary stats -->
+    <!-- Summary stats. The WS: sentinel comments are rewritten daily by
+         src/web_stats.py so non-JS crawlers see real numbers — do not
+         remove them. The script fetches fresher values live. -->
     <div class="stat-row" id="stat-row">
       <div class="stat-card">
-        <div class="stat-value" id="stat-daily">$&mdash;</div>
-        <div class="stat-label" id="stat-daily-label">Yesterday&rsquo;s delay cost</div>
+        <div class="stat-value" id="stat-daily"><!--WS:DAILY-->$&mdash;<!--/WS:DAILY--></div>
+        <div class="stat-label" id="stat-daily-label"><!--WS:DAILY_LABEL-->Yesterday&rsquo;s delay cost<!--/WS:DAILY_LABEL--></div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="stat-cumulative">$&mdash;</div>
+        <div class="stat-value" id="stat-cumulative"><!--WS:CUMULATIVE-->$&mdash;<!--/WS:CUMULATIVE--></div>
         <div class="stat-label">Cumulative since April 2026</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="stat-hours">&mdash;</div>
-        <div class="stat-label" id="stat-hours-label">Person-hours lost yesterday</div>
+        <div class="stat-value" id="stat-hours"><!--WS:HOURS-->&mdash;<!--/WS:HOURS--></div>
+        <div class="stat-label" id="stat-hours-label"><!--WS:HOURS_LABEL-->Person-hours lost yesterday<!--/WS:HOURS_LABEL--></div>
       </div>
     </div>
 

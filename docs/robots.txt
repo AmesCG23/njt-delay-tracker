@@ -1,3 +1,9 @@
+# NJT Delay Tracker — bettertrains.org
+# All crawlers are welcome, including AI/LLM crawlers (GPTBot, ClaudeBot,
+# Google-Extended, PerplexityBot, CCBot, and the rest). This site exists
+# to be read, indexed, and cited.
+# A machine-readable overview lives at https://bettertrains.org/llms.txt
+
 User-agent: *
 Allow: /
 
