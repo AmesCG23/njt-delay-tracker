@@ -49,6 +49,15 @@ from composer import compose_post
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
 
+# Attach a bettertrains.org link card (with og-card.png thumbnail) to the
+# daily Bluesky post. Set USE_LINK_CARD=false in daily.yml to post plain
+# text again — no code change needed.
+USE_LINK_CARD = os.environ.get("USE_LINK_CARD", "true").lower() == "true"
+
+SITE_URL = "https://bettertrains.org/"
+SITE_CARD_TITLE = "NJT Delay Tracker — the daily cost of late trains"
+SITE_CARD_DESCRIPTION = "Running totals, charts, and methodology — updated every weekday."
+
 RESOLUTION_PHRASES = [
     "on or close to schedule",
     "normal service",
@@ -349,8 +358,40 @@ def format_tweet(yesterday_et, totals):
     return post
 
 
-def post_to_bluesky(text):
-    """Post to Bluesky. Returns URI or None."""
+def _build_link_card_embed(client, card_path):
+    """
+    Build the bettertrains.org link-card embed for the daily post.
+
+    The thumbnail is docs/og-card.png (regenerated with the live cumulative
+    total just before posting). Every failure degrades gracefully:
+    thumbnail upload fails → card without a thumbnail; embed construction
+    fails → caller posts plain text. The day's post is never at risk.
+    """
+    from atproto import models
+
+    thumb_blob = None
+    if card_path and os.path.exists(card_path):
+        try:
+            with open(card_path, "rb") as f:
+                thumb_blob = client.upload_blob(f.read()).blob
+        except Exception as e:
+            print(f"[DAILY] Card thumbnail upload failed — link card without image: {e}")
+
+    return models.AppBskyEmbedExternal.Main(
+        external=models.AppBskyEmbedExternal.External(
+            uri=SITE_URL,
+            title=SITE_CARD_TITLE,
+            description=SITE_CARD_DESCRIPTION,
+            thumb=thumb_blob,
+        )
+    )
+
+
+def post_to_bluesky(text, card_path=None):
+    """
+    Post to Bluesky, attaching a bettertrains.org link card when enabled.
+    Returns URI or None.
+    """
     from atproto import Client
     handle   = os.environ.get("BLUESKY_HANDLE")
     password = os.environ.get("BLUESKY_PASSWORD")
@@ -360,8 +401,16 @@ def post_to_bluesky(text):
     try:
         client = Client()
         client.login(handle, password)
-        response = client.send_post(text)
-        print(f"[DAILY] Posted: {response.uri}")
+
+        embed = None
+        if USE_LINK_CARD:
+            try:
+                embed = _build_link_card_embed(client, card_path)
+            except Exception as e:
+                print(f"[DAILY] Link card build failed — posting plain text: {e}")
+
+        response = client.send_post(text, embed=embed)
+        print(f"[DAILY] Posted: {response.uri}" + (" (with link card)" if embed else ""))
         return response.uri
     except Exception as e:
         print(f"[DAILY] Failed to post: {e}")
@@ -472,7 +521,24 @@ def run():
     print(f"[DAILY] Character count: {len(tweet_text)}")
 
     if not DRY_RUN:
-        uri = post_to_bluesky(tweet_text)
+        # ── Social card refresh ──────────────────────────────────────────────
+        # Redraw docs/og-card.png with the live cumulative total (read from
+        # Totals!B2, which already includes today's Event Log rows). The
+        # workflow commits the refreshed file after this script exits, so
+        # GitHub Pages serves it to link scrapers. Fail-safe: on any error
+        # generate_card() returns None and the committed card stays in use.
+        # ⟵ ROLLBACK: USE_OG_CARD=false in daily.yml freezes the card.
+        card_path = None
+        try:
+            from og_card import generate_card
+            card_path = generate_card()
+        except Exception as e:
+            print(f"[DAILY] Card regeneration errored — using committed card: {e}")
+        if card_path is None:
+            committed = os.path.join(os.path.dirname(__file__), "..", "docs", "og-card.png")
+            card_path = committed if os.path.exists(committed) else None
+
+        uri = post_to_bluesky(tweet_text, card_path=card_path)
         now = datetime.now(ET)
         post_date = now.strftime("%Y-%m-%d")
         post_time = now.strftime("%H:%M:%S")

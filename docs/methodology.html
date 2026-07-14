@@ -4,6 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Methodology — NJ Transit Delay Cost Tracker</title>
+  <meta name="description" content="How the NJT Delay Tracker estimates the economic cost of NJ Transit rail delays: service alert data, ridership modeling from OPRA records, and the USDOT value of travel time.">
+  <link rel="canonical" href="https://bettertrains.org/methodology.html">
+
+  <!-- Icons -->
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#f0eeeb">
+
+  <!-- Social sharing card (Open Graph + Twitter) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="NJT Delay Tracker">
+  <meta property="og:title" content="Methodology — NJT Delay Tracker">
+  <meta property="og:description" content="How we estimate the economic cost of NJ Transit rail delays: service alert data, ridership modeling from OPRA records, and the USDOT value of travel time.">
+  <meta property="og:url" content="https://bettertrains.org/methodology.html">
+  <meta property="og:image" content="https://bettertrains.org/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="NJT Delay Tracker — tracking the daily cost of late trains. bettertrains.org, updated every weekday.">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Methodology — NJT Delay Tracker">
+  <meta name="twitter:description" content="How we estimate the economic cost of NJ Transit rail delays: service alert data, ridership modeling from OPRA records, and the USDOT value of travel time.">
+  <meta name="twitter:image" content="https://bettertrains.org/og-card.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
@@ -18,7 +44,7 @@
       --newsprint: #f0eeeb;
       --ink: #1a1a1a;
       --ink-light: #4a4a4a;
-      --ink-faint: #8a8a8a;
+      --ink-faint: #6b6b6b; /* WCAG AA contrast on newsprint; was #8a8a8a */
       --rule: #c0bdb8;
     }
 
@@ -241,6 +267,15 @@
       color: var(--ink-light);
       text-decoration: underline;
       text-underline-offset: 2px;
+    }
+
+    /* === REDUCED MOTION === */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
 
     /* === RESPONSIVE === */

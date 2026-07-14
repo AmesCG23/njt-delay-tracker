@@ -1,0 +1,13 @@
+{
+  "name": "NJT Delay Tracker",
+  "short_name": "NJT Delays",
+  "description": "Tracking the daily economic cost of NJ Transit rail delays.",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "theme_color": "#f0eeeb",
+  "background_color": "#f0eeeb",
+  "display": "browser",
+  "start_url": "/"
+}

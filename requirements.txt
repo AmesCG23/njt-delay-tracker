@@ -11,5 +11,8 @@ anthropic==0.40.0
 gspread==6.1.2
 google-auth==2.29.0
 
+# Social card rendering (og_card.py redraws docs/og-card.png with the live total)
+Pillow==12.3.0
+
 # Timezone database — provides IANA data for zoneinfo on minimal Linux runners
 tzdata==2025.2
