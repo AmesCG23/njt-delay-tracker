@@ -573,6 +573,25 @@ def run():
             log_run_summary(post_date, post_time, uri)
         except Exception as e:
             print(f"[DAILY] Run Log summary update failed: {e}")
+
+        # ── Static site stats refresh ────────────────────────────────────────
+        # Bake the day's figures into the static site files (index.html,
+        # graphs.html, data/latest.json, sitemap lastmod) so crawlers that
+        # don't run JavaScript — search engines' first pass and nearly all
+        # AI crawlers — see real numbers instead of "$—" placeholders. The
+        # workflow commits the refreshed files after this script exits,
+        # alongside og-card.png. Fail-safe: on any error the committed
+        # pages stay as they are and the run is unaffected.
+        # ⟵ ROLLBACK: USE_WEB_STATS=false in daily.yml freezes the baked stats.
+        try:
+            from web_stats import update_web_stats
+            update_web_stats(
+                daily_cost=totals["total_cost"],
+                person_hours=totals["total_person_hours"],
+                report_date=yesterday_et,
+            )
+        except Exception as e:
+            print(f"[DAILY] Web stats refresh errored — committed pages stay as-is: {e}")
     else:
         print("[DAILY] DRY RUN: not posting.")
 

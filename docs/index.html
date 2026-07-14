@@ -30,13 +30,58 @@
   <meta name="twitter:description" content="Every day NJ Transit runs late, and every day commuters and New York City employers absorb the cost. We track it, train by train. Here's how much.">
   <meta name="twitter:image" content="https://bettertrains.org/og-card.png">
 
+  <!-- The bot's daily posts as a feed (served by Bluesky) -->
+  <link rel="alternate" type="application/rss+xml" title="NJT Delay Tracker — daily posts" href="https://bsky.app/profile/njtdelaytracker.bsky.social/rss">
+
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "NJT Delay Tracker",
-    "url": "https://bettertrains.org/",
-    "description": "Tracking the daily economic cost of NJ Transit rail delays to commuters and New York City employers."
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://bettertrains.org/#org",
+        "name": "NJT Delay Tracker",
+        "url": "https://bettertrains.org/",
+        "logo": "https://bettertrains.org/icon-512.png",
+        "email": "bettertrains@proton.me",
+        "sameAs": ["https://bsky.app/profile/njtdelaytracker.bsky.social"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://bettertrains.org/#website",
+        "name": "NJT Delay Tracker",
+        "url": "https://bettertrains.org/",
+        "description": "Tracking the daily economic cost of NJ Transit rail delays to commuters and New York City employers.",
+        "publisher": { "@id": "https://bettertrains.org/#org" }
+      },
+      {
+        "@type": "Dataset",
+        "@id": "https://bettertrains.org/#dataset",
+        "name": "NJ Transit Rail Delay Cost Estimates",
+        "description": "Daily estimates of the economic cost of NJ Transit commuter rail delays, in person-hours and dollars of lost productive time. Derived from NJ Transit service alerts, OPRA ridership records, and the USDOT value-of-travel-time method ($44/hour). One figure per weekday since March 31, 2026, broken down by rail line and by morning versus evening rush.",
+        "url": "https://bettertrains.org/graphs.html",
+        "keywords": ["NJ Transit", "train delays", "commuter rail", "New Jersey", "New York", "Northeast Corridor", "transit performance", "delay cost", "Penn Station"],
+        "creator": { "@id": "https://bettertrains.org/#org" },
+        "temporalCoverage": "2026-03-31/..",
+        "spatialCoverage": { "@type": "Place", "name": "New Jersey and the New York metropolitan area" },
+        "isAccessibleForFree": true,
+        "measurementTechnique": "NJ Transit service alerts parsed daily; riders per train modeled from OPRA ridership data and GTFS schedules; delay time valued at $44/hour per the USDOT value-of-travel-time guidance applied to North Jersey commuter earnings. Full methodology at https://bettertrains.org/methodology.html",
+        "distribution": [
+          {
+            "@type": "DataDownload",
+            "name": "Latest daily snapshot (JSON)",
+            "encodingFormat": "application/json",
+            "contentUrl": "https://bettertrains.org/data/latest.json"
+          },
+          {
+            "@type": "DataDownload",
+            "name": "Full daily history (CSV)",
+            "encodingFormat": "text/csv",
+            "contentUrl": "https://docs.google.com/spreadsheets/d/e/2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce/pub?output=csv&gid=943972512"
+          }
+        ]
+      }
+    ]
   }
   </script>
 
@@ -267,17 +312,6 @@
       text-underline-offset: 2px;
     }
 
-    /* === LOADING STATE === */
-    .figure-loading {
-      opacity: 0.3;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.15; }
-    }
-
     /* ================================================================
        WORLD CUP MODE CSS — active June 13–July 31, 2026
        To remove: delete this entire block down to END WORLD CUP MODE CSS,
@@ -477,12 +511,15 @@
     <div class="hero-block">
       <p class="hero-lede">Every day New Jersey Transit runs late, and every day New Jersey commuters and New York City employers absorb the cost. Here&rsquo;s how much.</p>
 
-      <p class="figure-label" id="figure-label-daily">Most recently, New Jersey Transit delays cost commuters and New York City employers more than:</p>
-      <p class="figure-primary" id="figure-daily">$&mdash;</p>
-      <p class="figure-caption">in productive time, based on <strong id="figure-person-hours">&mdash;</strong> total hours of delays.</p>
+      <!-- The WS: sentinel comments below are rewritten daily by src/web_stats.py
+           with the latest figures, so non-JS crawlers see real numbers.
+           Do not remove them. The script fetches fresher values live. -->
+      <p class="figure-label" id="figure-label-daily"><!--WS:DAILY_LABEL-->Most recently, New Jersey Transit delays cost commuters and New York City employers more than:<!--/WS:DAILY_LABEL--></p>
+      <p class="figure-primary" id="figure-daily"><!--WS:DAILY-->$&mdash;<!--/WS:DAILY--></p>
+      <p class="figure-caption">in productive time, based on <strong id="figure-person-hours"><!--WS:HOURS-->&mdash;<!--/WS:HOURS--></strong> total hours of delays.</p>
 
       <p class="figure-label">Since we started tracking in April 2026, New Jersey Transit delays have cost commuters and employers more than:</p>
-      <p class="figure-secondary" id="figure-cumulative">$&mdash;</p>
+      <p class="figure-secondary" id="figure-cumulative"><!--WS:CUMULATIVE-->$&mdash;<!--/WS:CUMULATIVE--></p>
       <p class="figure-caption-secondary">in productive time spent waiting for missed, canceled, or delayed trains.</p>
 
       <p class="body-text">
@@ -545,10 +582,6 @@
     const elCumulative  = document.getElementById('figure-cumulative');
     const elPersonHours = document.getElementById('figure-person-hours');
 
-    // Add loading state
-    elDaily.classList.add('figure-loading');
-    elCumulative.classList.add('figure-loading');
-
     function formatDollars(raw) {
       const cleaned = String(raw).replace(/["$,\s]/g, '');
       const num = parseFloat(cleaned);
@@ -563,6 +596,14 @@
       return Math.round(num).toLocaleString('en-US');
     }
 
+    function setLabelFromDate(rawDate) {
+      const reportDate = formatReportDate(rawDate);
+      const label = document.getElementById('figure-label-daily');
+      if (label && reportDate) {
+        label.textContent = 'On ' + reportDate + ', New Jersey Transit delays cost commuters and New York City employers more than:';
+      }
+    }
+
     fetch(csvUrl)
       .then(res => {
         if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
@@ -574,23 +615,25 @@
         elDaily.textContent       = formatDollars(rows[0] || '');
         elCumulative.textContent  = formatDollars(rows[1] || '');
         elPersonHours.textContent = formatInteger(rows[2] || '');
-
-        const reportDate = formatReportDate(rows[3] || '');
-        const label = document.getElementById('figure-label-daily');
-        if (label && reportDate) {
-          label.textContent = 'On ' + reportDate + ', New Jersey Transit delays cost commuters and New York City employers more than:';
-        }
-
-        elDaily.classList.remove('figure-loading');
-        elCumulative.classList.remove('figure-loading');
+        setLabelFromDate(rows[3] || '');
       })
       .catch(err => {
         console.error('Could not load data from Google Sheets:', err);
-        elDaily.textContent       = '$—';
-        elCumulative.textContent  = '$—';
-        elPersonHours.textContent = '—';
-        elDaily.classList.remove('figure-loading');
-        elCumulative.classList.remove('figure-loading');
+        // Fall back to the snapshot the daily pipeline commits alongside
+        // the site. If that fails too, the figures baked into the HTML
+        // by src/web_stats.py simply remain in place.
+        fetch('data/latest.json')
+          .then(res => {
+            if (!res.ok) throw new Error(`Snapshot fetch failed: ${res.status}`);
+            return res.json();
+          })
+          .then(snap => {
+            if (typeof snap.daily_cost_usd === 'number')      elDaily.textContent       = formatDollars(String(snap.daily_cost_usd));
+            if (typeof snap.cumulative_cost_usd === 'number') elCumulative.textContent  = formatDollars(String(snap.cumulative_cost_usd));
+            if (typeof snap.daily_person_hours === 'number')  elPersonHours.textContent = formatInteger(String(snap.daily_person_hours));
+            setLabelFromDate(snap.report_date || '');
+          })
+          .catch(() => { /* keep the baked-in figures */ });
       });
   </script>
 
