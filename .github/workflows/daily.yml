@@ -31,6 +31,10 @@ jobs:
   daily-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # contents: write lets the run commit the refreshed docs/og-card.png
+    # (social sharing card with the live cumulative total) back to the repo.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,6 +53,38 @@ jobs:
           # AI-composed daily post (src/composer.py). Change to "false" to
           # instantly roll back to the fixed template — no code change needed.
           USE_COMPOSER: "true"
+          # Social card with live total (src/og_card.py). "false" freezes
+          # docs/og-card.png at its last committed version.
+          USE_OG_CARD: "true"
+          # bettertrains.org link card on the daily Bluesky post. "false"
+          # reverts to plain text posts.
+          USE_LINK_CARD: "true"
         run: |
           echo "DRY_RUN=$DRY_RUN"
           python src/daily.py
+
+      # Publish the refreshed social card (og_card.py redrew it with the
+      # live cumulative total during the pipeline run). GitHub Pages serves
+      # the committed file, so link previews pick up the new number.
+      # Skipped on dry runs; a no-op when the card is byte-identical
+      # (e.g. zero-delay days, when the cumulative total doesn't move).
+      - name: Commit refreshed social card
+        if: ${{ (github.event.inputs.dry_run || 'false') == 'false' }}
+        run: |
+          if git diff --quiet -- docs/og-card.png; then
+            echo "Social card unchanged — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/og-card.png
+          git commit -m "Update social card with latest cumulative total"
+          for i in 1 2 3; do
+            git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            echo "Push failed (attempt $i) — rebasing and retrying..."
+            git fetch origin "${{ github.ref_name }}"
+            git rebase "origin/${{ github.ref_name }}"
+            sleep 5
+          done
+          echo "Could not push refreshed card after 3 attempts." >&2
+          exit 1

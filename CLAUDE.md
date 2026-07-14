@@ -50,6 +50,11 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 ├── README.md                    ← public-facing project description
 ├── requirements.txt             ← Python package list
 ├── next_steps.md                ← checklist for getting the website live (mostly done now)
+├── assets/
+│   └── og-card/                 ← inputs for the daily social card render
+│       ├── og-card-template.png ← 1200×630 masthead, empty middle band
+│       ├── EBGaramond-*.ttf     ← instanced font subsets (SIL OFL, see OFL.txt)
+│       └── README.md
 ├── data/                        ← local data files, not committed to git
 ├── docs/                        ← GitHub Pages root; served as the public website
 │   ├── index.html               ← main page (running totals, summary stats)
@@ -69,7 +74,9 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 │   ├── interpreter.py           ← calls Claude Haiku to extract structured data
 │   ├── calculator.py            ← does the cost math (three calculation types)
 │   ├── aggregator.py            ← deduplicates events, sums totals
-│   └── logger.py                ← writes to Google Sheets (all tabs)
+│   ├── logger.py                ← writes to Google Sheets (all tabs)
+│   ├── composer.py              ← drafts the daily post with Claude Sonnet
+│   └── og_card.py               ← redraws docs/og-card.png with the live total
 └── .github/workflows/
     ├── daily.yml                ← automated daily run, Tue–Sat at 12:30 UTC (~8:30am ET)
     └── benchmark.yml            ← manual dry-run against any historical date
@@ -136,7 +143,7 @@ This is the entry point. When GitHub Actions runs `python src/daily.py`, everyth
 
 `format_tweet(yesterday_et, totals)` — Builds the text of the daily Bluesky post. Two formats: normal delays (total person-hours + cost + event count), or "good news" (no qualifying delays found). Has a 295-character safety cap.
 
-`post_to_bluesky(text)` — Logs in to Bluesky using `BLUESKY_HANDLE` and `BLUESKY_PASSWORD` secrets and posts the tweet. Returns the post URI, or `None` on failure.
+`post_to_bluesky(text, card_path=None)` — Logs in to Bluesky using `BLUESKY_HANDLE` and `BLUESKY_PASSWORD` secrets and posts the tweet, attaching a bettertrains.org link card (thumbnail = the freshly regenerated `og-card.png`) unless `USE_LINK_CARD=false`. Returns the post URI, or `None` on failure.
 
 `run()` — The main function. Orchestrates everything: clears logs, runs morning window, runs evening window, combines totals, posts tweet, logs everything.
 
@@ -153,6 +160,24 @@ On delay days, the daily post is drafted by Claude (Sonnet) instead of the fixed
 **⟵ ROLLBACK.** Fastest: set `USE_COMPOSER=false` in `daily.yml` (no code change — posts revert to the template on the next run). Permanent: flip the `USE_COMPOSER` default in `composer.py`, or revert the composer PR. Edit voice/samples/red-lines in `src/post_library.json`. If composed posts never appear despite the flag being on, the pinned `anthropic==0.40.0` SDK may need bumping for Sonnet — the pipeline keeps posting via the template meanwhile.
 
 Note: `format_tweet()`'s wording changed from "person-hours"/"person-minutes" to "hours"/"minutes" to match the composer's house style.
+
+---
+
+### `src/og_card.py` — The Social Card Regenerator
+
+Each real (non-dry-run) daily run redraws `docs/og-card.png` — the Open Graph image link previews show — so the card carries the **live cumulative delay cost** instead of a static tagline. No AI involved: `generate_card()` reads `Totals!B2` with the logger's existing service-account credentials (one extra read-only Sheets call; B2 already includes today's Event Log rows, which are written before the tweet posts), then draws "$X,XXX,XXX / in productive time lost to NJ Transit delays since April 2026 — and counting." onto `assets/og-card/og-card-template.png` with Pillow, using the EB Garamond subsets committed alongside it. The figure auto-shrinks if it ever grows too wide for the band. After the pipeline exits, a `daily.yml` step commits the refreshed PNG (as `github-actions[bot]`) so GitHub Pages serves it — a no-op on days the total didn't move.
+
+**Fail-safe by design.** On any failure (flag off, missing/unparsable B2, render error), `generate_card()` returns `None`, the previously committed card stays in place, and the pipeline continues — the day's post is never blocked.
+
+**⟵ ROLLBACK.** Set `USE_OG_CARD=false` in `daily.yml` — the card freezes at its last committed version. To restore the static-tagline card, revert `docs/og-card.png` to its pre-feature commit.
+
+**Test locally, no credentials needed:** `python src/og_card.py --total 8412067 --out /tmp/test-card.png`
+
+### The Bluesky link card (in `daily.py`)
+
+`post_to_bluesky()` attaches an `AppBskyEmbedExternal` link card pointing at bettertrains.org, using the freshly regenerated `og-card.png` as the thumbnail (uploaded as a blob each day, ~50KB). Bluesky doesn't unfurl bare URLs in API-created posts, so without this embed the daily post never links to the site. Degrades in layers: thumbnail upload fails → card without image; embed build fails → plain text post; the post itself is never at risk.
+
+**⟵ ROLLBACK.** Set `USE_LINK_CARD=false` in `daily.yml` — posts revert to plain text on the next run.
 
 ---
 
@@ -444,7 +469,7 @@ All files are in `docs/`. Hosted on GitHub Pages from the `main` branch `docs/` 
 185.199.111.153
 ```
 
-**Shared head metadata (all three pages, June 2026 website review):** every page carries a favicon set (`favicon.ico` + `favicon.svg` + `apple-touch-icon.png` + `site.webmanifest`), a meta description, a canonical URL, and Open Graph/Twitter card tags pointing at `og-card.png` (1200×630, regenerate if the brand changes). `robots.txt` and `sitemap.xml` sit at the docs root; `404.html` is the custom GitHub Pages error page. The `--ink-faint` gray was darkened `#8a8a8a` → `#6b6b6b` for WCAG AA contrast, and all pages carry a `prefers-reduced-motion` CSS block that disables animations.
+**Shared head metadata (all three pages, June 2026 website review):** every page carries a favicon set (`favicon.ico` + `favicon.svg` + `apple-touch-icon.png` + `site.webmanifest`), a meta description, a canonical URL, and Open Graph/Twitter card tags pointing at `og-card.png` (1200×630 — **auto-regenerated daily** with the live cumulative total by `src/og_card.py`; see that section). `robots.txt` and `sitemap.xml` sit at the docs root; `404.html` is the custom GitHub Pages error page. The `--ink-faint` gray was darkened `#8a8a8a` → `#6b6b6b` for WCAG AA contrast, and all pages carry a `prefers-reduced-motion` CSS block that disables animations.
 
 ### `docs/index.html` — Main Page
 
@@ -489,9 +514,12 @@ Static HTML. No dynamic data. Update the prose here when the methodology changes
 
 **Schedule:** `cron: "30 12 * * 2-6"` — 12:30 UTC, Tuesday through Saturday (~8:30am ET)  
 **Timeout:** 15 minutes  
-**Manual trigger:** `workflow_dispatch` with a `dry_run` input (default `true`)
+**Manual trigger:** `workflow_dispatch` with a `dry_run` input (default `true`)  
+**Permissions:** `contents: write` — needed by the "Commit refreshed social card" step, which pushes the updated `docs/og-card.png` back to the branch after each real run (skipped on dry runs; no-op when the card is unchanged).
 
 Scheduled runs: `DRY_RUN=false`. Manual runs: `DRY_RUN=true` by default. You can safely click "Run workflow" in the Actions tab to test without affecting production.
+
+**Feature flags set in the workflow env (all rollback levers, no code changes):** `USE_COMPOSER` (AI-drafted post text), `USE_OG_CARD` (regenerate the social card with the live total), `USE_LINK_CARD` (attach the bettertrains.org link card to the Bluesky post).
 
 ### `benchmark.yml` — Historical Replay
 
