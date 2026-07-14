@@ -6,9 +6,12 @@ previews (Bluesky, iMessage, Slack, Facebook, ...) show the running
 total instead of a static tagline.
 
 How it works — no AI, no extra services:
-  1. Reads the cumulative total from the Totals tab (B2) using the same
+  1. Reads the running cumulative total by summing the Event Log's
+     "Dollar Estimate" column (the same figure Totals!B2's
+     =SUM('Event Log'!I:I) formula computes), using the same
      service-account credentials the logger already uses. One extra
-     read-only Sheets call per day.
+     read-only Sheets call per day. The Totals tab is a secondary
+     fallback — see fetch_cumulative_total() for why.
   2. Draws the number onto assets/og-card/og-card-template.png with
      Pillow, using EB Garamond subsets committed to assets/og-card/
      (SIL OFL — see OFL.txt there).
@@ -41,6 +44,12 @@ FONT_NUMBER = os.path.join(_ASSETS, "EBGaramond-Bold-subset.ttf")
 FONT_CONTEXT = os.path.join(_ASSETS, "EBGaramond-MediumItalic-subset.ttf")
 CARD_PATH = os.path.join(_REPO_ROOT, "docs", "og-card.png")
 
+# Sheet tabs the cumulative total is read from
+EVENT_LOG_TAB = "Event Log"     # canonical accumulator, written every run
+DOLLAR_COLUMN_HEADER = "Dollar Estimate"
+DOLLAR_COLUMN_FALLBACK_IDX = 8  # column I (0-based) per the Event Log schema
+TOTALS_TAB = "Totals"           # secondary source (=SUM('Event Log'!I:I))
+
 # Palette — must match the website's CSS variables
 INK = "#1a1a1a"
 INK_LIGHT = "#4a4a4a"
@@ -57,13 +66,60 @@ CONTEXT_SIZE = 34
 MAX_TEXT_W = 1040      # keep clear of the side margins
 
 
+def _parse_money(value):
+    """Coerce a Sheets cell (number or formatted string) to a float, or None."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    cleaned = re.sub(r"[^0-9.]", "", str(value or ""))
+    try:
+        return float(cleaned) if cleaned else None
+    except ValueError:
+        return None
+
+
+def _total_from_event_log(spreadsheet):
+    """
+    Sum the Event Log's "Dollar Estimate" column — the same figure
+    Totals!B2 (=SUM('Event Log'!I:I)) computes, but without depending on a
+    tab named exactly "Totals". The Event Log is the canonical accumulator
+    and is written every run, so it's the most reliable source. Locates the
+    column by header, falling back to the fixed schema index.
+    """
+    values = spreadsheet.worksheet(EVENT_LOG_TAB).get_all_values()
+    if len(values) < 2:  # header only, or empty
+        return None
+
+    header = values[0]
+    try:
+        col = header.index(DOLLAR_COLUMN_HEADER)
+    except ValueError:
+        col = DOLLAR_COLUMN_FALLBACK_IDX
+
+    total = 0.0
+    for row in values[1:]:
+        if col < len(row):
+            amount = _parse_money(row[col])
+            if amount:
+                total += amount
+    return total if total > 0 else None
+
+
 def fetch_cumulative_total():
     """
-    Read the running cumulative dollar total from Totals!B2
-    (=SUM('Event Log'!I:I), so it already includes today's events,
-    which are logged before the tweet posts).
+    Return the running cumulative dollar total (already including today's
+    events, which are logged before the tweet posts).
 
-    Returns a positive float, or None if the value is missing/unparsable.
+    Primary source: sum the Event Log's "Dollar Estimate" column. This is
+    exactly what Totals!B2 (=SUM('Event Log'!I:I)) computes, but doesn't
+    depend on a tab named "Totals" existing — which is what broke on
+    2026-07-14, when worksheet("Totals") raised WorksheetNotFound and both
+    this card and web_stats.py (which calls this function) fell back to
+    their previously committed figures.
+
+    Secondary source: Totals!B2, if that tab is present. Belt-and-suspenders
+    in case the Event Log is ever renamed.
+
+    Returns a positive float, or None if neither source yields one.
     """
     from logger import get_sheet_client  # reuses GOOGLE_CREDENTIALS_JSON auth
 
@@ -74,17 +130,27 @@ def fetch_cumulative_total():
 
     client = get_sheet_client()
     spreadsheet = client.open_by_key(sheet_id)
-    raw = spreadsheet.worksheet("Totals").acell("B2").value
-    cleaned = re.sub(r"[^0-9.]", "", raw or "")
-    if not cleaned:
-        print(f"[OG-CARD] Totals!B2 unparsable: {raw!r}")
-        return None
 
-    total = float(cleaned)
-    if total <= 0:
-        print(f"[OG-CARD] Totals!B2 is zero/negative ({total}) — not rendering.")
-        return None
-    return total
+    # Primary: sum the Event Log directly.
+    try:
+        total = _total_from_event_log(spreadsheet)
+        if total:
+            return total
+        print("[OG-CARD] Event Log yielded no positive total — trying Totals!B2.")
+    except Exception as e:
+        print(f"[OG-CARD] Event Log sum failed ({e}) — trying Totals!B2.")
+
+    # Secondary: the Totals tab, if it exists under that name.
+    try:
+        raw = spreadsheet.worksheet(TOTALS_TAB).acell("B2").value
+        total = _parse_money(raw)
+        if total and total > 0:
+            return total
+        print(f"[OG-CARD] Totals!B2 empty/zero/unparsable: {raw!r}")
+    except Exception as e:
+        print(f"[OG-CARD] Totals!B2 unavailable: {e}")
+
+    return None
 
 
 def render_card(total, out_path=CARD_PATH):
