@@ -69,6 +69,32 @@ jobs:
           echo "DRY_RUN=$DRY_RUN"
           python src/daily.py
 
+      # ── Dry-run card preview ────────────────────────────────────────────
+      # On a MANUAL dry run (Actions → Run workflow → dry_run: true) this
+      # regenerates the social card from the LIVE cumulative total and
+      # uploads it as a downloadable artifact — so you can confirm the card
+      # renders correctly, and that the Sheets read works, WITHOUT posting a
+      # tweet or committing anything. (The main pipeline step skips card
+      # generation on dry runs, so this is the only thing that exercises it.)
+      # og_card.py writes no file if the total can't be read, so a missing
+      # artifact means the fetch failed — check the [OG-CARD] log line above.
+      # Never runs on scheduled/production runs (dry_run is empty there).
+      - name: Preview social card (dry run only)
+        if: ${{ always() && github.event.inputs.dry_run == 'true' }}
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          USE_OG_CARD: "true"
+        run: python src/og_card.py --out card-preview.png
+
+      - name: Upload social card preview
+        if: ${{ always() && github.event.inputs.dry_run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: og-card-preview
+          path: card-preview.png
+          if-no-files-found: warn
+
       # Publish the refreshed site files: the social card (og_card.py) and
       # the baked-in site stats (web_stats.py — static figures in
       # index.html/graphs.html, data/latest.json, sitemap lastmod).

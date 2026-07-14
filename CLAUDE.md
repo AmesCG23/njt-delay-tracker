@@ -176,7 +176,10 @@ Each real (non-dry-run) daily run redraws `docs/og-card.png` — the Open Graph 
 
 **⟵ ROLLBACK.** Set `USE_OG_CARD=false` in `daily.yml` — the card freezes at its last committed version. To restore the static-tagline card, revert `docs/og-card.png` to its pre-feature commit.
 
-**Test locally, no credentials needed:** `python src/og_card.py --total 8412067 --out /tmp/test-card.png`
+**How to test the card (no tweet, no commit):**
+- **Render only, no credentials:** `python src/og_card.py --total 8412067 --out /tmp/test-card.png` — draws the card for a made-up total. Tests layout/fonts only.
+- **Full live path, with credentials:** `python src/og_card.py --out /tmp/test-card.png` (needs `GOOGLE_SHEET_ID` + `GOOGLE_CREDENTIALS_JSON`) — actually reads the cumulative total from the sheet and renders it. This exercises `fetch_cumulative_total()`, the part that a `--total` render can't cover. Writes nothing if the read fails.
+- **From GitHub, no local credentials:** Actions → "NJT Daily Pipeline" → Run workflow → `dry_run: true`. The **"Preview social card (dry run only)"** step regenerates the card from the live total and uploads it as the **`og-card-preview`** artifact for download. No tweet is posted and nothing is committed (the dry-run pipeline skips card generation itself; this dedicated step is what renders the preview). A missing artifact means the live read failed — check the `[OG-CARD]` log line.
 
 ### The Bluesky link card (in `daily.py`)
 
