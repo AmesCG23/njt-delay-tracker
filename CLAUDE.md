@@ -55,8 +55,14 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 │   ├── index.html               ← main page (running totals, summary stats)
 │   ├── graphs.html              ← charts page (delay trends, by-line, morning/evening)
 │   ├── methodology.html         ← how the estimates are calculated
+│   ├── 404.html                 ← custom "page delayed" error page
 │   ├── CNAME                    ← custom domain for GitHub Pages
-│   └── njt-delay-tracker-logo.svg
+│   ├── njt-delay-tracker-logo.svg
+│   ├── favicon.svg / favicon.ico / apple-touch-icon.png / icon-192.png / icon-512.png
+│   │                            ← favicon set (gold slash on ink; large sizes show "NJT /")
+│   ├── og-card.png              ← 1200×630 social sharing card (Open Graph/Twitter image)
+│   ├── site.webmanifest         ← web app manifest (points at icon-192/512)
+│   └── robots.txt / sitemap.xml ← search engine indexing helpers
 ├── src/                         ← all Python pipeline code
 │   ├── daily.py                 ← main orchestrator — runs the full pipeline
 │   ├── watcher.py               ← fetches posts from Bluesky, classifies alert types
@@ -438,6 +444,8 @@ All files are in `docs/`. Hosted on GitHub Pages from the `main` branch `docs/` 
 185.199.111.153
 ```
 
+**Shared head metadata (all three pages, June 2026 website review):** every page carries a favicon set (`favicon.ico` + `favicon.svg` + `apple-touch-icon.png` + `site.webmanifest`), a meta description, a canonical URL, and Open Graph/Twitter card tags pointing at `og-card.png` (1200×630, regenerate if the brand changes). `robots.txt` and `sitemap.xml` sit at the docs root; `404.html` is the custom GitHub Pages error page. The `--ink-faint` gray was darkened `#8a8a8a` → `#6b6b6b` for WCAG AA contrast, and all pages carry a `prefers-reduced-motion` CSS block that disables animations.
+
 ### `docs/index.html` — Main Page
 
 Displays three numbers fetched live from the `for_web` tab:
@@ -706,7 +714,7 @@ A seasonal Easter egg active June 13 – July 31, 2026 (2026 FIFA World Cup, hos
 - World Cup window: June 13 – July 31, 2026 (`isWorldCupSeason()`)
 
 ### Soccer ball sprite sheet
-`docs/soccer-ball-sprite.png` — 1024×1024, 8 cols × 8 rows, 128×128px per frame. Source: mustitz/ballgen project (public domain example). Frames are pre-extracted into `BALL_FRAMES[sizeIdx][frameIdx]` as canvas data URLs on page load. The spin interval is cleared via `animationend` listener.
+`docs/soccer-ball-sprite.png` — 1024×1024, 8 cols × 8 rows, 128×128px per frame. Source: mustitz/ballgen project (public domain example). Frames are pre-extracted into `BALL_FRAMES[sizeIdx][frameIdx]` as canvas data URLs. The sprite sheet (~700KB) is lazy-loaded by `startWC()` via `loadBallSheet()` — visitors who never enable the mode (or visit off-season) don't download it. The spin interval is cleared via `animationend` listener. Auto-start additionally respects `prefers-reduced-motion` (the manual toggle still works, but the site-wide reduced-motion CSS suppresses the float animations).
 
 ### How to remove World Cup Mode entirely
 

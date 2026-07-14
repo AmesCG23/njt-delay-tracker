@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Delayed — NJT Delay Tracker</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#f0eeeb">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --newsprint: #f0eeeb;
+      --ink: #1a1a1a;
+      --ink-light: #4a4a4a;
+      --ink-faint: #6b6b6b;
+      --rule: #c0bdb8;
+    }
+
+    body {
+      font-family: 'EB Garamond', 'Georgia', 'Times New Roman', serif;
+      background-color: var(--newsprint);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+    }
+
+    .logo img {
+      height: 64px;
+      width: auto;
+      display: block;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 2rem 3rem;
+      text-align: center;
+    }
+
+    .error-code {
+      font-size: 5rem;
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .error-headline {
+      font-size: 1.5rem;
+      font-weight: 400;
+      line-height: 1.45;
+      max-width: 520px;
+      margin: 0 auto 0.75rem;
+    }
+
+    .error-caption {
+      font-size: 1.05rem;
+      color: var(--ink-light);
+      font-style: italic;
+      margin-bottom: 2rem;
+    }
+
+    .error-nav a {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .error-nav a:hover {
+      color: var(--ink-light);
+    }
+
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 1.25rem 2rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 0.8rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 600px) {
+      .error-code { font-size: 3.5rem; }
+      .error-headline { font-size: 1.15rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <a href="/">
+        <img src="/njt-delay-tracker-logo.svg" alt="NJT Delay Tracker">
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="error-code">404</h1>
+    <p class="error-headline">This page is operating up to 60&nbsp;minutes behind schedule &mdash; or it may have been cancelled altogether.</p>
+    <p class="error-caption">We apologize for the inconvenience. Expect residual delays while we investigate.</p>
+    <nav class="error-nav">
+      <a href="/">&larr; Return to the main page</a>
+    </nav>
+  </main>
+
+  <footer>
+    <p class="footer-text">
+      This site is not affiliated with New Jersey Transit in any way. NJ Transit would never admit a page is this late.
+    </p>
+  </footer>
+
+</body>
+</html>
