@@ -9,7 +9,15 @@
     "Say \"hours\", never \"person-hours\" or \"person-minutes\".",
     "Hold the system to account; never blame crews or individual workers.",
     "Do not speculate about specific causes of the delays.",
-    "Use only the figures provided. Do not compute or introduce any other numbers."
+    "Use only the figures provided. Do not compute or introduce any other numbers.",
+    "Avoid trite sign-offs and stock flourishes."
+  ],
+
+  "banned_phrases": [
+    "brutal",
+    "we just keep counting",
+    "the meter is always running",
+    "the numbers don't lie"
   ],
 
   "redline_keywords": [

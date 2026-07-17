@@ -56,11 +56,16 @@ MAX_POST_CHARS = 295
 _LIBRARY_PATH = os.path.join(os.path.dirname(__file__), "post_library.json")
 
 _RETRY_SUFFIX = (
-    "\n\nYour previous attempt was rejected (too long, missing a required "
-    "figure, or it contained a hashtag/link/emoji or the phrase "
-    "\"person-hours\"). Write it again: one paragraph under 280 characters, "
-    "containing both required strings exactly, plain text only."
+    "\n\nYour previous attempt was rejected. Write a fresh version: one "
+    "paragraph under 280 characters, containing both required figures exactly, "
+    "plain text only (no hashtags, links, emojis, or the word \"person-hours\"), "
+    "with a distinctly different opening and wording from your recent posts, and "
+    "none of the banned phrases."
 )
+
+# How many of the most recent posts to show the model (for anti-repetition)
+# and to check new drafts against for near-duplication.
+RECENT_POSTS_SHOWN = 6
 
 
 # ── Library ────────────────────────────────────────────────────────────────────
@@ -130,6 +135,7 @@ def fetch_history(before_date=None):
             "date": report_date,
             "hours": hours,
             "cost": _parse_cost(r[2]) if len(r) > 2 else None,
+            "text": r[1].strip() if len(r) > 1 else "",  # column B: the post itself
         })
     return out
 
@@ -272,12 +278,25 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
 
 # ── Prompt + model call ─────────────────────────────────────────────────────────
 
-def build_task_prompt(stats, samples, library):
-    rules = "\n".join(f"- {r}" for r in library.get("hard_rules", []))
+def build_task_prompt(stats, samples, library, recent_posts=()):
+    rules = list(library.get("hard_rules", []))
+    rules.append(
+        "Vary your opening: do not start with the same word or construction as "
+        "your recent posts below."
+    )
+    banned = library.get("banned_phrases", [])
+    if banned:
+        rules.append(
+            "Never use these words or phrases: " + ", ".join(f'"{b}"' for b in banned) + "."
+        )
+    rules_block = "\n".join(f"- {r}" for r in rules)
+
     sample_block = "\n".join(f"- {s}" for s in samples)
     facts_block = "\n".join(f"- {f}" for f in stats["comparison_facts"]) or (
         "- (none — do NOT compare to averages, records, streaks, or past days)"
     )
+    recent_block = "\n".join(f"- {p}" for p in recent_posts) or "- (none yet)"
+
     return f"""Write ONE Bluesky post summarizing yesterday's NJ Transit delays.
 
 Yesterday was {stats['day_name']}.
@@ -293,12 +312,16 @@ USE THESE FIGURES EXACTLY — copy the strings verbatim, do not recompute:
 You MAY use at most ONE of these comparison facts, or none. Do not invent others:
 {facts_block}
 
-Scenario: {stats['scenario']}. Past posts in this scenario — match their voice
+Scenario: {stats['scenario']}. Past posts in this scenario — match their VOICE
 and rhythm, do NOT copy them:
 {sample_block}
 
+Your most RECENT posts (any scenario) — make today's clearly DIFFERENT from
+these in its opening and overall wording, not just in the numbers:
+{recent_block}
+
 Rules:
-{rules}
+{rules_block}
 - The post MUST contain the exact strings "{stats['hours_str']}" and "{stats['cost_str']}".
 - Output ONLY the post text — no preamble, no surrounding quotation marks, no explanation."""
 
@@ -331,7 +354,34 @@ def _clean(text):
     return text
 
 
-def validate(text, stats):
+def _norm_words(s):
+    return re.findall(r"[a-z0-9]+", (s or "").lower())
+
+
+def _too_similar(text, recent_posts, opening_words=4, jaccard_max=0.6):
+    """
+    True if `text` reads like a near-duplicate of a recent post: it opens with
+    the same first few words as the most recent post, or shares too large a
+    fraction of its vocabulary with any of the last three. Conservative on
+    purpose — genuinely different framings of similar facts still pass.
+    """
+    words = _norm_words(text)
+    if not words:
+        return False
+    cand_open, cand_set = words[:opening_words], set(words)
+    for i, prev in enumerate(recent_posts[:3]):
+        pw = _norm_words(prev)
+        if not pw:
+            continue
+        if i == 0 and len(cand_open) == opening_words and pw[:opening_words] == cand_open:
+            return True
+        union = cand_set | set(pw)
+        if union and len(cand_set & set(pw)) / len(union) > jaccard_max:
+            return True
+    return False
+
+
+def validate(text, stats, banned_phrases=(), recent_posts=()):
     """Mechanical checks. A composed post must pass all of these."""
     if not text:
         return False
@@ -342,9 +392,14 @@ def validate(text, stats):
         return False
     if "person-hour" in low or "person-minute" in low:
         return False
+    for phrase in banned_phrases:
+        if phrase.lower() in low:
+            return False
     for needed in stats["must_include"]:
         if needed not in text:
             return False
+    if _too_similar(text, recent_posts):
+        return False
     return True
 
 
@@ -396,11 +451,20 @@ def compose_post(yesterday_et, totals, morning_totals, evening_totals, all_event
     samples = library["samples"].get(
         stats["scenario"], library["samples"]["typical_day"]
     )
-    prompt = build_task_prompt(stats, samples, library)
+    banned = library.get("banned_phrases", [])
+
+    # Most recent actual posts, newest first — shown to the model so it varies
+    # from them, and checked against for near-duplication.
+    recent_posts = [
+        h["text"] for h in sorted(history, key=lambda r: r["date"], reverse=True)
+        if h.get("text")
+    ][:RECENT_POSTS_SHOWN]
+
+    prompt = build_task_prompt(stats, samples, library, recent_posts)
 
     for attempt, extra in enumerate(("", _RETRY_SUFFIX)):
         text = _clean(_call_model(library["style_brief"], prompt + extra))
-        if validate(text, stats):
+        if validate(text, stats, banned, recent_posts):
             label = "retry" if attempt else "first try"
             print(f"[COMPOSER] Composed post ({stats['scenario']}, {label}, "
                   f"{len(text)} chars).")
@@ -424,8 +488,12 @@ if __name__ == "__main__":
         "must_include": ["16,864 hours", "$742,040"],
         "sufficient_history": True,
     }
+    demo_recent = [
+        "Rough one out there Monday. NJ Transit delays cost commuters 11,240 hours...",
+        "Credit where due: Tuesday was quiet by NJ Transit standards. 940 hours...",
+    ]
     lib = load_library()
     print("SYSTEM:\n" + lib["style_brief"] + "\n")
     print("USER:\n" + build_task_prompt(
-        demo_stats, lib["samples"]["bad_day"], lib
+        demo_stats, lib["samples"]["bad_day"], lib, demo_recent
     ))
