@@ -151,20 +151,33 @@ def _fmt_hours(h):
     return f"{round(h):,} hours"
 
 
-def _worst_line(all_events):
-    """Human-readable name of the line with the most lost hours, or None."""
+def _worst_driver(all_events):
+    """
+    Human phrase for the biggest single source of lost hours, or None.
+
+    A named rail line comes back as its own name. System-wide events are NOT
+    lines — Penn Station is the NYC gateway (a hub-wide slowdown across every
+    line), and a Hoboken diversion reroutes Midtown Direct service — so they
+    get hub-appropriate phrasing the model can drop into a sentence without
+    implying "the Penn Station line ran late."
+    """
     tally = {}
     for ev in all_events:
         line = ev.get("line", "Unknown")
         if ev.get("system_wide") and not ev.get("line_suspension"):
-            line = ("Hoboken diversions"
-                    if line == "System-Wide (Hoboken Diversion)"
-                    else "Penn Station")
+            key = "_hoboken" if line == "System-Wide (Hoboken Diversion)" else "_penn"
+        else:
+            key = line
         hrs = (ev.get("estimated_riders") or 0) * (ev.get("delay_minutes") or 0) / 60
-        tally[line] = tally.get(line, 0.0) + hrs
+        tally[key] = tally.get(key, 0.0) + hrs
     if not tally:
         return None
-    return max(tally, key=tally.get)
+    worst = max(tally, key=tally.get)
+    if worst == "_penn":
+        return "system-wide delays into and out of Penn Station"
+    if worst == "_hoboken":
+        return "Midtown Direct trains diverted to Hoboken"
+    return worst  # a named rail line
 
 
 def _heavier_rush(morning_totals, evening_totals):
@@ -267,7 +280,7 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
         "hours_str": hours_str,
         "event_count": totals["event_count"],
         "line_count": len(totals.get("lines_affected", [])),
-        "worst_line": _worst_line(all_events),
+        "worst_driver": _worst_driver(all_events),
         "heavier_rush": _heavier_rush(morning_totals, evening_totals),
         "scenario": scenario,
         "comparison_facts": facts,
@@ -306,7 +319,7 @@ USE THESE FIGURES EXACTLY — copy the strings verbatim, do not recompute:
 - Time lost: {stats['hours_str']}
 - Delay events: {stats['event_count']}
 - Lines affected: {stats['line_count']}
-- Hardest-hit line: {stats['worst_line'] or 'n/a'}
+- Biggest single source of lost time: {stats['worst_driver'] or 'n/a'}
 - Heavier period: {stats['heavier_rush'] or 'n/a'}
 
 You MAY use at most ONE of these comparison facts, or none. Do not invent others:
@@ -482,7 +495,7 @@ if __name__ == "__main__":
         "date": "2026-03-31", "day_name": "Monday",
         "cost_str": "$742,040", "hours_str": "16,864 hours",
         "event_count": 30, "line_count": 5,
-        "worst_line": "Northeast Corridor", "heavier_rush": "evening rush",
+        "worst_driver": "Northeast Corridor", "heavier_rush": "evening rush",
         "scenario": "bad_day",
         "comparison_facts": ["Yesterday was about 1.8x the recent daily average."],
         "must_include": ["16,864 hours", "$742,040"],
