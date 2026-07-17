@@ -4,9 +4,9 @@
   "report_date": "2026-07-16",
   "daily_cost_usd": 594293,
   "daily_person_hours": 13507,
-  "cumulative_cost_usd": 36046757,
+  "cumulative_cost_usd": 36641050,
   "cumulative_since": "2026-03-31",
-  "updated_utc": "2026-07-17T14:15:37Z",
+  "updated_utc": "2026-07-17T15:31:01Z",
   "methodology": "https://bettertrains.org/methodology.html",
   "notes": "Estimates of productive time lost to NJ Transit commuter rail delays; opportunity costs, not cash losses, and not an official accounting. Not affiliated with NJ Transit."
 }
