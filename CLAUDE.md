@@ -749,7 +749,7 @@ Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 A seasonal Easter egg active June 13 – July 31, 2026 (2026 FIFA World Cup, hosted in USA/Canada/Mexico). Lives in `docs/index.html` — all World Cup code is clearly delimited with removal instructions in comments.
 
-**Current state (as of June 7, 2026): fully implemented and merged to `main`.**
+**Current state: DISABLED as of July 2026 (tournament over).** All four blocks in `docs/index.html` are commented out in place (not deleted) — the CSS rules and script body are wrapped in `/* */`, and the overlay div, `.header-right` wrapper, and `#wc-toggle` button are wrapped in `<!-- -->`, leaving `<nav class="social-icons">` a direct child of `<header>`. To re-enable for a future tournament, remove those comment wrappers. The removal steps below still apply for permanent deletion.
 
 ### What it does
 - Floating animated elements rise from the bottom of the screen
