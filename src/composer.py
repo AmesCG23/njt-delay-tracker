@@ -49,6 +49,11 @@ MODEL = "claude-sonnet-5"
 # numbers with no comparisons.
 MIN_HISTORY_DAYS = 30
 
+# Some data-commentary claims (records, rankings) need a real denominator
+# before they mean anything — "3rd-worst of 40 days" is weak. Gate those
+# behind more history than the basic average comparison.
+ANALYSIS_MIN_HISTORY = 60
+
 # Hard character cap for a composed post (Bluesky's limit is 300; the style
 # brief asks for ≤280). A post over this is rejected, not truncated.
 MAX_POST_CHARS = 295
@@ -136,6 +141,10 @@ def fetch_history(before_date=None):
             "hours": hours,
             "cost": _parse_cost(r[2]) if len(r) > 2 else None,
             "text": r[1].strip() if len(r) > 1 else "",  # column B: the post itself
+            # Column Q (index 16): system-wide Penn Station person-hours. > 0
+            # means that day had a Penn/Portal system-wide event. Powers the
+            # "Penn frequency" data-commentary detector.
+            "penn": (_parse_int(r[16]) or 0) > 0 if len(r) > 16 else False,
         })
     return out
 
@@ -198,6 +207,131 @@ def _ordinal(n):
     return f"{n}{suffix}"
 
 
+def _longest_run(vals, pred):
+    """Longest run of consecutive items satisfying pred."""
+    best = cur = 0
+    for v in vals:
+        cur = cur + 1 if pred(v) else 0
+        best = max(best, cur)
+    return best
+
+
+def _select_analysis(candidates, last_post_text):
+    """
+    Pick the highest-salience data-commentary phrase, skipping one whose angle
+    already appeared in the most recent post (anti-staleness). Falls back to
+    the top by salience if every candidate would repeat yesterday.
+    Each candidate is (score, phrase, signature).
+    """
+    if not candidates:
+        return None
+    ordered = sorted(candidates, key=lambda c: c[0], reverse=True)
+    low = (last_post_text or "").lower()
+    for _score, phrase, signature in ordered:
+        if signature and signature.lower() in low:
+            continue
+        return phrase
+    return ordered[0][1]
+
+
+def _analysis_candidates(hours, avg_recent, prior, seq, streak_above,
+                         streak_below, is_record, milestone_amt, penn_today):
+    """
+    The palette of data-commentary detectors. Each returns (salience, phrase,
+    signature) when it fires. Only the single highest-salience one is surfaced
+    (280 chars holds one line). Facts only — the model phrases them.
+    """
+    cand = []
+    n_prior = len(prior)
+    deep = n_prior >= ANALYSIS_MIN_HISTORY  # some claims need a real denominator
+
+    # Cumulative milestone crossed today.
+    if milestone_amt is not None:
+        cand.append((90, f"the running total since launch just passed {_fmt_cost(milestone_amt)}",
+                     "just passed"))
+
+    # Penn / Portal recurring system-wide delays.
+    penn_hist = [bool(r.get("penn")) for r in prior]
+    window = penn_hist[-9:] + [penn_today]
+    penn_k, penn_n = sum(window), len(window)
+    if penn_today and penn_k >= 3:
+        cand.append((85, f"system-wide Penn Station delays have now hit {penn_k} of the last {penn_n} days",
+                     "Penn Station"))
+
+    # Record chase — longest run of above-average days ever.
+    longest_above = _longest_run(seq, lambda v: avg_recent and v > avg_recent)
+    if deep and streak_above >= 4 and streak_above == longest_above:
+        cand.append((80, f"the longest stretch of above-average days on record — {streak_above} and counting",
+                     "longest stretch"))
+
+    # Ranking among all days (richer than the binary record).
+    worse = sum(1 for r in prior if r["hours"] > hours)
+    lighter = sum(1 for r in prior if r["hours"] < hours)
+    worst_rank, light_rank = worse + 1, lighter + 1
+    if deep and not is_record and worst_rank <= 3:
+        cand.append((75, f"the {_ordinal(worst_rank)}-worst day on record", "-worst day on record"))
+    elif deep and not is_record and worst_rank <= 5:
+        cand.append((55, f"the {_ordinal(worst_rank)}-worst day on record", "-worst day on record"))
+    if deep and light_rank <= 3:
+        cand.append((55, f"one of the lightest days on record — the {_ordinal(light_rank)}-lightest",
+                     "lightest"))
+
+    # Relatable equivalence on the biggest days.
+    if avg_recent and hours >= 5 * avg_recent:
+        n_days = round(hours / avg_recent)
+        cand.append((70, f"as much lost time in a single day as {n_days} average days combined",
+                     "average days combined"))
+
+    # Calmest stretch — longest run of below-average days ever, or a shorter run.
+    longest_below = _longest_run(seq, lambda v: avg_recent and v < avg_recent)
+    if deep and streak_below >= 4 and streak_below == longest_below:
+        cand.append((65, f"the calmest stretch on record — {streak_below} straight days under the average",
+                     "calmest stretch"))
+    elif streak_below in (3, 5, 7, 10, 14, 21):
+        cand.append((45, f"the {_ordinal(streak_below)} straight day under the average — a calmer run",
+                     "straight day under"))
+
+    # Turning point — a notable streak just broke today. prev_* is the run of
+    # above/below-average days among the prior days only (not counting today).
+    prior_hours = [r["hours"] for r in prior]
+    prev_above = 0
+    for v in reversed(prior_hours):
+        if avg_recent and v > avg_recent:
+            prev_above += 1
+        else:
+            break
+    prev_below = 0
+    for v in reversed(prior_hours):
+        if avg_recent and v < avg_recent:
+            prev_below += 1
+        else:
+            break
+    if avg_recent and hours < avg_recent and prev_above >= 3:
+        cand.append((60, f"the first day under the average after {prev_above} straight above it",
+                     "first day under"))
+    elif avg_recent and hours > avg_recent and prev_below >= 3:
+        cand.append((60, f"the first day back above average after {prev_below} straight below it",
+                     "first day back"))
+
+    # Momentum — the last week versus the monthly norm.
+    last7 = prior_hours[-7:]
+    if len(last7) >= 5 and avg_recent:
+        tr = (sum(last7) / len(last7)) / avg_recent
+        if tr >= 1.20:
+            cand.append((50, f"the last week is running about {round((tr - 1) * 100)}% above the monthly average",
+                         "the last week"))
+        elif tr <= 0.80:
+            cand.append((50, f"the last week is running about {round((1 - tr) * 100)}% below the monthly average",
+                         "the last week"))
+
+    # Above-average streak, surfaced only at escalation points (avoids
+    # "3rd... 4th... 5th straight" monotony) and only when nothing richer fired.
+    if not is_record and streak_above in (3, 5, 7, 10, 14, 21):
+        cand.append((48, f"the {_ordinal(streak_above)} straight day above average", "straight day above"))
+
+    return cand
+
+
 def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
                   all_events, history):
     """
@@ -252,7 +386,7 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
     if ratio is None:
         # No baseline yet: assess by absolute size, no average comparison.
         vs_average = None
-        notable = None
+        analysis = None
         if hours >= 8000:
             assessment, scenario = "a heavy day", "bad_day"
         elif hours <= 2000:
@@ -280,18 +414,19 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
         else:
             assessment, scenario = "an average day", "typical_day"
 
-        # One optional piece of context (a record is already in the assessment).
-        if milestone_amt is not None:
-            notable = f"the cumulative total since launch just passed {_fmt_cost(milestone_amt)}"
-            scenario = "milestone"
-        elif not is_record and streak_above >= 3:
-            notable = f"the {_ordinal(streak_above)} straight day above average"
-            scenario = "trend_rising"
-        elif streak_below >= 3:
-            notable = f"the {_ordinal(streak_below)} straight day below average"
-            scenario = "trend_falling"
-        else:
-            notable = None
+        # Beat 5 — the single sharpest piece of data commentary, chosen from a
+        # palette of detectors (trend / ranking / composition), skipping any
+        # angle that already appeared in the most recent post.
+        penn_today = any(
+            ev.get("system_wide") and not ev.get("line_suspension")
+            and ev.get("line") == "System-Wide (Penn Station)"
+            for ev in all_events
+        )
+        candidates = _analysis_candidates(
+            hours, avg_recent, prior, seq, streak_above, streak_below,
+            is_record, milestone_amt, penn_today,
+        )
+        analysis = _select_analysis(candidates, prior[-1].get("text", "") if prior else "")
 
     return {
         "date": today,
@@ -305,7 +440,7 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
         "vs_average": vs_average,
         "worst_driver": _worst_driver(all_events),
         "heavier_rush": _heavier_rush(morning_totals, evening_totals),
-        "notable": notable,
+        "analysis": analysis,
         "scenario": scenario,
         "must_include": [hours_str, cost_str],
         "sufficient_history": sufficient,
@@ -332,27 +467,35 @@ def build_task_prompt(stats, examples, library, recent_posts=()):
     else:
         beat3 = "3. (No average established yet — skip the comparison to normal.)"
 
-    # Optional, data-based commentary — offered, never required.
+    # Beat 5 — one line of data commentary, only when a detector fired.
+    if stats.get("analysis"):
+        beat5 = (f"5. Add one plain line of data commentary putting the day in a "
+                 f"bigger-picture context: {stats['analysis']}. Work it in "
+                 f"naturally — it can stand in for the step-3 comparison if they overlap.")
+    else:
+        beat5 = "5. (No standout pattern today — no data-commentary line needed.)"
+
+    # Secondary detail — used only if it fits and sharpens the point.
     extras = []
     if stats.get("worst_driver"):
         extras.append(f"Hardest hit: {stats['worst_driver']}")
     if stats.get("heavier_rush"):
         extras.append(f"Heavier period: {stats['heavier_rush']}")
-    if stats.get("notable"):
-        extras.append(f"Context: {stats['notable']}")
     extras_block = "\n".join(f"- {e}" for e in extras) or "- (none)"
 
     return f"""Write ONE short Bluesky post about {stats['day_name']}'s NJ Transit delays.
 Follow this framework, in order — but VARY your word choice day to day and let the
-numbers carry the message. State the facts plainly; do not editorialize.
+numbers carry the message. State the facts plainly; do not editorialize. Keep the
+whole post under 280 characters: if it runs long, drop the least important element
+rather than cramming everything in.
 
 1. Open with a plain assessment of the day — it was {stats['assessment']}. Put it in your own words.
 2. State the scale: {stats['event_count']} delays and {stats['hours_str']} of riders' time lost.
 {beat3}
 4. Give the cost: {stats['cost_str']} in lost productive time to commuters and New York City employers.
+{beat5}
 
-Optional — weave in AT MOST ONE of these, and only if it genuinely sharpens the
-point; otherwise leave them out entirely:
+Secondary detail — weave in AT MOST ONE, and only if it fits and sharpens the point:
 {extras_block}
 
 Examples of the right structure and plain tone (do NOT copy them — match the
@@ -525,7 +668,7 @@ if __name__ == "__main__":
         "event_count": 30, "line_count": 5,
         "avg_hours_str": "9,400 hours", "vs_average": "about 1.8x the recent average",
         "worst_driver": "Northeast Corridor", "heavier_rush": "evening rush",
-        "notable": None, "scenario": "bad_day",
+        "analysis": "the 3rd-worst day on record", "scenario": "bad_day",
         "must_include": ["16,864 hours", "$742,040"],
         "sufficient_history": True,
     }
