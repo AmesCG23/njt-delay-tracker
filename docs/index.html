@@ -313,11 +313,11 @@
     }
 
     /* ================================================================
-       WORLD CUP MODE CSS — active June 13–July 31, 2026
-       To remove: delete this entire block down to END WORLD CUP MODE CSS,
-       then follow the three remaining removal steps in CLAUDE.md.
+       WORLD CUP MODE CSS — DISABLED (season over, July 2026)
+       The rules below are commented out. To re-enable next year, remove the
+       comment wrappers around them. Full removal steps are in CLAUDE.md.
        ================================================================ */
-
+    /*
     #wc-overlay {
       position: fixed;
       inset: 0;
@@ -372,7 +372,6 @@
       100% { transform: translateY(-110vh) translateX(0px)   rotate(0deg);  opacity: 0;   }
     }
 
-    /* Stacks Bluesky icon above the WC toggle button */
     .header-right {
       display: flex;
       flex-direction: column;
@@ -428,6 +427,7 @@
       85%  { border-color: #FF44BB; box-shadow: 2px 2px 0 #880044; }
       100% { border-color: #FF4444; box-shadow: 2px 2px 0 #880000; }
     }
+    */
 
     /* ================================================================
        END WORLD CUP MODE CSS
@@ -476,8 +476,9 @@
 </head>
 <body>
 
-  <!-- WORLD CUP MODE: floater overlay — remove this div to excise the feature -->
-  <div id="wc-overlay" aria-hidden="true"></div>
+  <!-- WORLD CUP MODE: floater overlay — DISABLED (season over, July 2026).
+       Re-enable by uncommenting the div below. -->
+  <!-- <div id="wc-overlay" aria-hidden="true"></div> -->
   <!-- END WORLD CUP MODE overlay -->
 
   <header>
@@ -491,7 +492,10 @@
          To remove: delete this <div class="header-right"> wrapper and its closing tag,
          and the <button id="wc-toggle"> — leaving <nav class="social-icons"> as a
          direct child of <header>. -->
-    <div class="header-right">
+    <!-- WORLD CUP MODE DISABLED (season over, July 2026): .header-right wrapper
+         and #wc-toggle button commented out, leaving <nav> a direct child of
+         <header> (its original structure). Re-enable by uncommenting them. -->
+    <!-- <div class="header-right"> -->
       <nav class="social-icons">
         <!-- Bluesky -->
         <a href="https://bsky.app/profile/njtdelaytracker.bsky.social" aria-label="Bluesky" title="Follow on Bluesky">
@@ -500,8 +504,8 @@
           </svg>
         </a>
       </nav>
-      <button id="wc-toggle">⚽ World Cup Mode</button>
-    </div>
+      <!-- <button id="wc-toggle">⚽ World Cup Mode</button> -->
+    <!-- </div> -->
     <!-- END WORLD CUP MODE header -->
 
   </header>
@@ -642,6 +646,11 @@
        To remove: delete this entire <script> block.
        ================================================================ -->
   <script>
+  /* WORLD CUP MODE SCRIPT — DISABLED (season over, July 2026). The entire
+     script body below is commented out, so nothing runs. To re-enable next
+     year, remove this opening comment marker and the closing one just before
+     the closing script tag.
+
     // Soccer ball sprite sheet (mustitz/ballgen — public domain example)
     // 1024×1024, 8 cols × 8 rows, 128×128px per frame. Row 3 = front-facing view.
     const SHEET_COLS = 8;
@@ -814,6 +823,7 @@
     if (isWorldCupSeason() && !userHasOptedOut() && !wcReducedMotion) {
       startWC();
     }
+  */
   </script>
   <!-- END WORLD CUP MODE SCRIPT -->
 
