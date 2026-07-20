@@ -158,11 +158,18 @@ This is the entry point. When GitHub Actions runs `python src/daily.py`, everyth
 
 ### `src/composer.py` — The AI Post Writer
 
-On delay days, the daily post is drafted by Claude (Sonnet) instead of the fixed `format_tweet()` template. `compose_post()` reads the `Tweet_log` history (one extra read-only Sheets call), computes a fact sheet of numbers in plain Python (yesterday's cost/hours/worst line/AM-vs-PM split, plus 30-day average, all-time record, streaks, and cumulative milestones), classifies the day into a scenario, and hands Claude only the matching sample posts from `src/post_library.json` plus that fact sheet. The model phrases the numbers; it never computes them. The result is mechanically validated (length, required figures present verbatim, no hashtags/links/"person-hours").
+On delay days, the daily post is drafted by Claude (Sonnet) instead of the fixed `format_tweet()` template. `compose_post()` reads the `Tweet_log` history (one extra read-only Sheets call) and computes a fact sheet in plain Python. The post is built around a **fixed four-beat framework** (in `build_task_prompt`), and the model is told to vary its word choice and let the numbers speak — no editorializing:
+
+1. **Assessment** — a plain characterization of the day (`stats["assessment"]`, e.g. "an average day", "one of the worst days lately", "the worst day on record"), derived from the day's ratio to the recent average and whether it's an all-time record.
+2. **Scale** — `event_count` delays and `hours_str` lost.
+3. **Vs. average** — the recent 30-day average (`avg_hours_str`) and a comparison phrase (`vs_average`). Skipped until 30 days of history exist.
+4. **Cost** — `cost_str`, framed as lost productive time to commuters and New York City employers.
+
+Plus optional, offered-not-required commentary the model weaves in only if it sharpens the point: `worst_driver` (hardest-hit line or hub), `heavier_rush`, and one `notable` context line (a cumulative milestone crossed, or an above/below-average streak). `src/post_library.json` holds the voice (`style_brief`), the `hard_rules`, the `banned_phrases` (mechanically rejected — "brutal", "staggering", trite sayings, etc.), the `redline_keywords`, and a flat list of plain `examples` that demonstrate the framework. The model phrases the numbers; it never computes them. The result is mechanically validated (length; required cost/hours strings present verbatim; no hashtags/links/"person-hours"; no banned phrase; not a near-duplicate of a recent post).
 
 **Fail-safe by design.** If the feature flag is off, a red-line keyword is present (injury/fatality/police — see `post_library.json`), the API errors, or validation fails twice, `compose_post()` returns `None` and `daily.py` falls back to `format_tweet()`. Zero-delay days always use the fixed "Good news!" template — the composer is only consulted when `event_count > 0`. Cost: ~$0.15–0.25/month.
 
-**⟵ ROLLBACK.** Fastest: set `USE_COMPOSER=false` in `daily.yml` (no code change — posts revert to the template on the next run). Permanent: flip the `USE_COMPOSER` default in `composer.py`, or revert the composer PR. Edit voice/samples/red-lines in `src/post_library.json`. If composed posts never appear despite the flag being on, the pinned `anthropic==0.40.0` SDK may need bumping for Sonnet — the pipeline keeps posting via the template meanwhile.
+**⟵ ROLLBACK.** Fastest: set `USE_COMPOSER=false` in `daily.yml` (no code change — posts revert to the template on the next run). Permanent: flip the `USE_COMPOSER` default in `composer.py`, or revert the composer PR. Edit voice/examples/rules/banned-words/red-lines in `src/post_library.json`; the four-beat framework wording itself lives in `build_task_prompt` in `composer.py`. If composed posts never appear despite the flag being on, the pinned `anthropic==0.40.0` SDK may need bumping for Sonnet — the pipeline keeps posting via the template meanwhile.
 
 Note: `format_tweet()`'s wording changed from "person-hours"/"person-minutes" to "hours"/"minutes" to match the composer's house style.
 
@@ -780,6 +787,8 @@ A seasonal Easter egg active June 13 – July 31, 2026 (2026 FIFA World Cup, hos
 
 The code in `docs/index.html` is split into four clearly commented blocks. Remove all four and the page will be exactly as it was before. Each block is bounded by matching open/close comments so you can find them with a text search.
 
+> **Note (disabled July 2026):** these four blocks are currently **commented out** (the feature is off — see *Current state* above), but the boundary marker comments are still in place, so each step's search-and-delete-to-end-marker still works for permanent removal. The HTML snippets shown below are the **original, un-commented** form; in the file today the code between the markers is wrapped in comments (`/* */` for the CSS/script, `<!-- -->` for the overlay div, wrapper, and button).
+
 **Step 1 — CSS block** (inside `<style>`, ~110 lines)
 
 Search for: `WORLD CUP MODE CSS`  
@@ -796,7 +805,7 @@ Delete these three lines:
 
 **Step 3 — Header restructure** (the trickiest step)
 
-The header currently looks like:
+In its original (un-commented) form, the header block is:
 ```html
 <!-- WORLD CUP MODE: .header-right stacks ... -->
 <div class="header-right">

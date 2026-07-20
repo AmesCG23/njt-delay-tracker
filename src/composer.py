@@ -190,6 +190,14 @@ def _heavier_rush(morning_totals, evening_totals):
     return "morning rush" if m > e else "evening rush"
 
 
+def _ordinal(n):
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
 def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
                   all_events, history):
     """
@@ -236,54 +244,69 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
         if cum_before < boundary <= cum_now:
             milestone_amt = boundary
 
-    # Scenario + the single comparison fact (if any) the model may cite.
-    facts = []
-    if not sufficient:
-        # No baseline yet: classify by absolute size, allow no comparisons.
+    # Beat 1 (assessment of the day), beat 3 (comparison to the average), and
+    # one optional piece of context. All facts — the model only phrases them.
+    ratio = hours / avg_recent if (sufficient and avg_recent) else None
+    avg_hours_str = _fmt_hours(avg_recent) if ratio is not None else None
+
+    if ratio is None:
+        # No baseline yet: assess by absolute size, no average comparison.
+        vs_average = None
+        notable = None
         if hours >= 8000:
-            scenario = "bad_day"
+            assessment, scenario = "a heavy day", "bad_day"
         elif hours <= 2000:
-            scenario = "quiet_day"
+            assessment, scenario = "a light day", "quiet_day"
         else:
-            scenario = "typical_day"
+            assessment, scenario = "an ordinary day", "typical_day"
     else:
-        ratio = hours / avg_recent if avg_recent else 1.0
-        if is_record:
-            scenario = "record_day"
-            facts.append("This is the worst single day for delays on record.")
-        elif milestone_amt is not None:
-            scenario = "milestone"
-            facts.append(
-                f"The running total of measured delay costs since launch has "
-                f"just passed {_fmt_cost(milestone_amt)} (now about {_fmt_cost(cum_now)})."
-            )
-        elif streak_above >= 3:
-            scenario = "trend_rising"
-            facts.append(f"That's {streak_above} straight days above the 30-day average.")
-        elif streak_below >= 3:
-            scenario = "trend_falling"
-            facts.append(f"That's {streak_below} straight days below the 30-day average.")
-        elif ratio >= 1.5:
-            scenario = "bad_day"
-            facts.append(f"Yesterday was about {ratio:.1f}x the recent daily average.")
-        elif ratio <= 0.5:
-            scenario = "quiet_day"
-            facts.append("Yesterday was well below the recent daily average.")
+        if ratio >= 1.15:
+            vs_average = f"about {ratio:.1f}x the recent average"
+        elif ratio <= 0.85:
+            vs_average = "well below the recent average"
         else:
-            scenario = "typical_day"
-            facts.append("That's about a normal day by recent standards.")
+            vs_average = "right around the recent average"
+
+        if is_record:
+            assessment, scenario = "the worst day on record", "record_day"
+        elif ratio >= 2.0:
+            assessment, scenario = "one of the worst days lately", "bad_day"
+        elif ratio >= 1.5:
+            assessment, scenario = "a heavy day, well above average", "bad_day"
+        elif ratio <= 0.5:
+            assessment, scenario = "a notably light day", "quiet_day"
+        elif ratio <= 0.85:
+            assessment, scenario = "a lighter-than-average day", "quiet_day"
+        else:
+            assessment, scenario = "an average day", "typical_day"
+
+        # One optional piece of context (a record is already in the assessment).
+        if milestone_amt is not None:
+            notable = f"the cumulative total since launch just passed {_fmt_cost(milestone_amt)}"
+            scenario = "milestone"
+        elif not is_record and streak_above >= 3:
+            notable = f"the {_ordinal(streak_above)} straight day above average"
+            scenario = "trend_rising"
+        elif streak_below >= 3:
+            notable = f"the {_ordinal(streak_below)} straight day below average"
+            scenario = "trend_falling"
+        else:
+            notable = None
 
     return {
         "date": today,
         "day_name": yesterday_et.strftime("%A"),
+        "assessment": assessment,
         "cost_str": cost_str,
         "hours_str": hours_str,
         "event_count": totals["event_count"],
         "line_count": len(totals.get("lines_affected", [])),
+        "avg_hours_str": avg_hours_str,
+        "vs_average": vs_average,
         "worst_driver": _worst_driver(all_events),
         "heavier_rush": _heavier_rush(morning_totals, evening_totals),
+        "notable": notable,
         "scenario": scenario,
-        "comparison_facts": facts,
         "must_include": [hours_str, cost_str],
         "sufficient_history": sufficient,
     }
@@ -291,46 +314,52 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
 
 # ── Prompt + model call ─────────────────────────────────────────────────────────
 
-def build_task_prompt(stats, samples, library, recent_posts=()):
+def build_task_prompt(stats, examples, library, recent_posts=()):
     rules = list(library.get("hard_rules", []))
-    rules.append(
-        "Vary your opening: do not start with the same word or construction as "
-        "your recent posts below."
-    )
     banned = library.get("banned_phrases", [])
     if banned:
         rules.append(
             "Never use these words or phrases: " + ", ".join(f'"{b}"' for b in banned) + "."
         )
     rules_block = "\n".join(f"- {r}" for r in rules)
-
-    sample_block = "\n".join(f"- {s}" for s in samples)
-    facts_block = "\n".join(f"- {f}" for f in stats["comparison_facts"]) or (
-        "- (none — do NOT compare to averages, records, streaks, or past days)"
-    )
+    example_block = "\n".join(f"- {s}" for s in examples)
     recent_block = "\n".join(f"- {p}" for p in recent_posts) or "- (none yet)"
 
-    return f"""Write ONE Bluesky post summarizing yesterday's NJ Transit delays.
+    # Beat 3 depends on whether there's a baseline to compare against yet.
+    if stats.get("avg_hours_str"):
+        beat3 = (f"3. Compare to normal: the recent daily average is "
+                 f"{stats['avg_hours_str']} ({stats['vs_average']}).")
+    else:
+        beat3 = "3. (No average established yet — skip the comparison to normal.)"
 
-Yesterday was {stats['day_name']}.
+    # Optional, data-based commentary — offered, never required.
+    extras = []
+    if stats.get("worst_driver"):
+        extras.append(f"Hardest hit: {stats['worst_driver']}")
+    if stats.get("heavier_rush"):
+        extras.append(f"Heavier period: {stats['heavier_rush']}")
+    if stats.get("notable"):
+        extras.append(f"Context: {stats['notable']}")
+    extras_block = "\n".join(f"- {e}" for e in extras) or "- (none)"
 
-USE THESE FIGURES EXACTLY — copy the strings verbatim, do not recompute:
-- Cost: {stats['cost_str']}
-- Time lost: {stats['hours_str']}
-- Delay events: {stats['event_count']}
-- Lines affected: {stats['line_count']}
-- Biggest single source of lost time: {stats['worst_driver'] or 'n/a'}
-- Heavier period: {stats['heavier_rush'] or 'n/a'}
+    return f"""Write ONE short Bluesky post about {stats['day_name']}'s NJ Transit delays.
+Follow this framework, in order — but VARY your word choice day to day and let the
+numbers carry the message. State the facts plainly; do not editorialize.
 
-You MAY use at most ONE of these comparison facts, or none. Do not invent others:
-{facts_block}
+1. Open with a plain assessment of the day — it was {stats['assessment']}. Put it in your own words.
+2. State the scale: {stats['event_count']} delays and {stats['hours_str']} of riders' time lost.
+{beat3}
+4. Give the cost: {stats['cost_str']} in lost productive time to commuters and New York City employers.
 
-Scenario: {stats['scenario']}. Past posts in this scenario — match their VOICE
-and rhythm, do NOT copy them:
-{sample_block}
+Optional — weave in AT MOST ONE of these, and only if it genuinely sharpens the
+point; otherwise leave them out entirely:
+{extras_block}
 
-Your most RECENT posts (any scenario) — make today's clearly DIFFERENT from
-these in its opening and overall wording, not just in the numbers:
+Examples of the right structure and plain tone (do NOT copy them — match the
+plainness, and vary from these and from your recent posts):
+{example_block}
+
+Your most recent posts — make today's clearly different in wording:
 {recent_block}
 
 Rules:
@@ -461,9 +490,7 @@ def compose_post(yesterday_et, totals, morning_totals, evening_totals, all_event
     history = fetch_history(before_date=yesterday_et.isoformat())
     stats = compute_stats(yesterday_et, totals, morning_totals,
                           evening_totals, all_events, history)
-    samples = library["samples"].get(
-        stats["scenario"], library["samples"]["typical_day"]
-    )
+    examples = library.get("examples", [])
     banned = library.get("banned_phrases", [])
 
     # Most recent actual posts, newest first — shown to the model so it varies
@@ -473,7 +500,7 @@ def compose_post(yesterday_et, totals, morning_totals, evening_totals, all_event
         if h.get("text")
     ][:RECENT_POSTS_SHOWN]
 
-    prompt = build_task_prompt(stats, samples, library, recent_posts)
+    prompt = build_task_prompt(stats, examples, library, recent_posts)
 
     for attempt, extra in enumerate(("", _RETRY_SUFFIX)):
         text = _clean(_call_model(library["style_brief"], prompt + extra))
@@ -493,20 +520,21 @@ if __name__ == "__main__":
     # Eyeball the prompt for a synthetic bad day without calling the API.
     demo_stats = {
         "date": "2026-03-31", "day_name": "Monday",
+        "assessment": "one of the worst days lately",
         "cost_str": "$742,040", "hours_str": "16,864 hours",
         "event_count": 30, "line_count": 5,
+        "avg_hours_str": "9,400 hours", "vs_average": "about 1.8x the recent average",
         "worst_driver": "Northeast Corridor", "heavier_rush": "evening rush",
-        "scenario": "bad_day",
-        "comparison_facts": ["Yesterday was about 1.8x the recent daily average."],
+        "notable": None, "scenario": "bad_day",
         "must_include": ["16,864 hours", "$742,040"],
         "sufficient_history": True,
     }
     demo_recent = [
-        "Rough one out there Monday. NJ Transit delays cost commuters 11,240 hours...",
-        "Credit where due: Tuesday was quiet by NJ Transit standards. 940 hours...",
+        "Yesterday was an average day on NJ Transit: 23 delays, 4,120 hours lost...",
+        "A lighter day than usual: 8 delays, 720 hours lost, well under average...",
     ]
     lib = load_library()
     print("SYSTEM:\n" + lib["style_brief"] + "\n")
     print("USER:\n" + build_task_prompt(
-        demo_stats, lib["samples"]["bad_day"], lib, demo_recent
+        demo_stats, lib["examples"], lib, demo_recent
     ))
