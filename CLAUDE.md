@@ -205,7 +205,7 @@ Each real daily run bakes the day's figures into the static site files, so crawl
 3. **`docs/data/latest.json`** — a machine-readable daily snapshot (report date, daily cost/hours, cumulative). Also used by index.html as a same-origin fallback when the browser's Google Sheets fetch fails. If the cumulative read fails, the previous snapshot's cumulative value is preserved rather than nulled.
 4. **`docs/sitemap.xml`** — bumps `<lastmod>` for `/` and `/graphs.html`.
 
-Daily cost and person-hours come from the totals the pipeline already computed; the cumulative total is read via og_card's `fetch_cumulative_total()` (one extra read-only Sheets call). The workflow's "Commit refreshed site files" step commits everything in `docs/` after the run, same as the social card. The browser JavaScript still fetches live values and overwrites the baked text, so human visitors always see the freshest numbers.
+Daily cost and person-hours come from the totals the pipeline already computed; the cumulative total is the same today-inclusive figure drawn on the social card (`for_web!A2` + today's total), passed in by `daily.py` so the baked page figure and the card always agree. The workflow's "Commit refreshed site files" step commits everything in `docs/` after the run, same as the social card. The browser JavaScript still fetches live values and overwrites the baked text, so human visitors always see the freshest numbers.
 
 **Fail-safe by design.** On any failure `update_web_stats()` returns `None`, the committed pages stay as they are, and the run is unaffected.
 
@@ -388,7 +388,7 @@ All Google Sheets writes happen here. Uses `gspread` + a service account credent
 
 ## The Google Sheet: Six Tabs
 
-One tab accumulates forever (Tweet_log), two are fresh every day (Run Log, Alert Log), one grows daily and keeps history (Event Log), one is formula-driven (Totals), and one feeds the website (for_web).
+One tab accumulates forever (Tweet_log), two are fresh every day (Run Log, Alert Log), one grows daily and keeps history (Event Log), and one feeds the website (for_web, which sums Tweet_log). *(An earlier `Totals` tab that held `=SUM('Event Log'!I:I)` no longer exists — the cumulative figure now lives in `for_web`; see the note under "Tab 2" below.)*
 
 ### Tab 1: Event Log (accumulates forever — never wiped)
 
@@ -410,11 +410,9 @@ One row per delay event after deduplication. Written once per window by `log_del
 | L: Raw Alert Text | Original Bluesky post text |
 | M: Posted to Bluesky | Always "No" — individual events are never posted; legacy column |
 
-### Tab 2: Totals (formula-driven — never written by code)
+### Tab 2: ~~Totals~~ — removed
 
-- **B2:** `=SUM('Event Log'!I:I)` — running cumulative dollar total across all events ever logged
-
-This tab exists so you can see the cumulative total at a glance. The formula updates automatically as Event Log grows.
+There is **no `Totals` tab.** It once held `B2 = =SUM('Event Log'!I:I)`, but the canonical cumulative figure is now `for_web!A2`, which sums the **Tweet_log** tab (one curated row per day) — the figure the website and the social card both read. Do not sum the Event Log for the cumulative: the Event Log is a per-event audit log that accumulates duplicate/orphan rows from re-runs, so its sum drifts above the curated Tweet_log total. (This mismatch is exactly what made the social card and the baked page flash an inflated number — fixed by pointing `og_card.py` at `for_web!A2`.)
 
 ### Tab 3: Tweet_log (accumulates forever — never wiped)
 
@@ -481,14 +479,14 @@ This tab is what the website reads. It's a simple column of values the website f
 | Cell | Content | Written by |
 |---|---|---|
 | A1 | Yesterday's total delay cost (dollars, rounded) | `log_tweet()` — automatic |
-| A2 | Cumulative total since launch (dollars) | **Manual** — use `=Totals!B2` or enter directly |
+| A2 | Cumulative total since launch (dollars) — **the figure the website and the social card both read** | Formula: `=SUM(Tweet_log!C:C)` (Tweet_log's Total Cost column) |
 | A3 | Yesterday's total person-hours | `log_tweet()` — automatic |
 | A4 | Report date (YYYY-MM-DD — the date of delays = yesterday) | `log_tweet()` — automatic |
 | A5 | (reserved) | — |
 | A6 | Cumulative morning cost since launch | **Manual** — use `=SUM(Tweet_log!I:I)` |
 | A7 | Cumulative evening cost since launch | **Manual** — use `=SUM(Tweet_log!J:J)` |
 
-A2, A6, and A7 are not written by code — use formulas or update manually.
+A2, A6, and A7 are not written by code — they're `=SUM(Tweet_log!…)` formulas. A2 (the cumulative the website + card read) sums the Total Cost column; A6/A7 sum the morning/evening columns. `og_card.py` reads A2 directly and `daily.py` adds the current run's total on top (Tweet_log isn't written until after the card is drawn), so the card matches the site.
 
 ---
 

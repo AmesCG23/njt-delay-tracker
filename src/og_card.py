@@ -6,12 +6,13 @@ previews (Bluesky, iMessage, Slack, Facebook, ...) show the running
 total instead of a static tagline.
 
 How it works — no AI, no extra services:
-  1. Reads the running cumulative total by summing the Event Log's
-     "Dollar Estimate" column (the same figure Totals!B2's
-     =SUM('Event Log'!I:I) formula computes), using the same
-     service-account credentials the logger already uses. One extra
-     read-only Sheets call per day. The Totals tab is a secondary
-     fallback — see fetch_cumulative_total() for why.
+  1. Reads the cumulative total the WEBSITE shows — for_web!A2, which
+     sums the Tweet_log tab — using the same service-account credentials
+     the logger already uses. daily.py adds the current run's total on
+     top (Tweet_log isn't written until after the card is drawn), so the
+     card matches the site once the run finishes. Summing the Tweet_log
+     Total Cost column directly is the fallback. One read-only Sheets
+     call per day.
   2. Draws the number onto assets/og-card/og-card-template.png with
      Pillow, using EB Garamond subsets committed to assets/og-card/
      (SIL OFL — see OFL.txt there).
@@ -44,11 +45,14 @@ FONT_NUMBER = os.path.join(_ASSETS, "EBGaramond-Bold-subset.ttf")
 FONT_CONTEXT = os.path.join(_ASSETS, "EBGaramond-MediumItalic-subset.ttf")
 CARD_PATH = os.path.join(_REPO_ROOT, "docs", "og-card.png")
 
-# Sheet tabs the cumulative total is read from
-EVENT_LOG_TAB = "Event Log"     # canonical accumulator, written every run
-DOLLAR_COLUMN_HEADER = "Dollar Estimate"
-DOLLAR_COLUMN_FALLBACK_IDX = 8  # column I (0-based) per the Event Log schema
-TOTALS_TAB = "Totals"           # secondary source (=SUM('Event Log'!I:I))
+# Where the cumulative total is read from. It MUST be the same figure the
+# website shows, or the card and the site disagree: the website reads
+# for_web!A2 (which sums Tweet_log), so the card reads that exact cell.
+# Summing the Tweet_log Total Cost column is the fallback.
+FOR_WEB_TAB = "for_web"
+FOR_WEB_CUMULATIVE_CELL = "A2"   # the cell the website's JS reads (CSV rows[1])
+TWEET_LOG_TAB = "Tweet_log"      # fallback source (one row per day)
+TWEET_LOG_COST_COL_IDX = 2       # column C, "Total Cost Estimate" ("$X,XXX.XX")
 
 # Palette — must match the website's CSS variables
 INK = "#1a1a1a"
@@ -77,28 +81,30 @@ def _parse_money(value):
         return None
 
 
-def _total_from_event_log(spreadsheet):
+def _read_for_web_cumulative(spreadsheet):
     """
-    Sum the Event Log's "Dollar Estimate" column — the same figure
-    Totals!B2 (=SUM('Event Log'!I:I)) computes, but without depending on a
-    tab named exactly "Totals". The Event Log is the canonical accumulator
-    and is written every run, so it's the most reliable source. Locates the
-    column by header, falling back to the fixed schema index.
+    Read for_web!A2 — the exact cell the website displays as the cumulative
+    total (it sums the Tweet_log tab). Reading it here keeps the social card
+    and the website in lockstep. Returns a positive float, or None.
     """
-    values = spreadsheet.worksheet(EVENT_LOG_TAB).get_all_values()
-    if len(values) < 2:  # header only, or empty
-        return None
+    raw = spreadsheet.worksheet(FOR_WEB_TAB).acell(FOR_WEB_CUMULATIVE_CELL).value
+    total = _parse_money(raw)
+    return total if total and total > 0 else None
 
-    header = values[0]
-    try:
-        col = header.index(DOLLAR_COLUMN_HEADER)
-    except ValueError:
-        col = DOLLAR_COLUMN_FALLBACK_IDX
 
+def _sum_tweet_log(spreadsheet):
+    """
+    Fallback: sum the Tweet_log tab's Total Cost column (one row per day) —
+    the same figure for_web!A2 is built from, for when that cell can't be
+    read. Every row is parsed; a header cell fails _parse_money and is
+    skipped, so this is robust whether or not a header row is present.
+    Returns a positive float, or None.
+    """
+    values = spreadsheet.worksheet(TWEET_LOG_TAB).get_all_values()
     total = 0.0
-    for row in values[1:]:
-        if col < len(row):
-            amount = _parse_money(row[col])
+    for row in values:
+        if TWEET_LOG_COST_COL_IDX < len(row):
+            amount = _parse_money(row[TWEET_LOG_COST_COL_IDX])
             if amount:
                 total += amount
     return total if total > 0 else None
@@ -106,18 +112,15 @@ def _total_from_event_log(spreadsheet):
 
 def fetch_cumulative_total():
     """
-    Return the running cumulative dollar total (already including today's
-    events, which are logged before the tweet posts).
+    Return the cumulative dollar total the WEBSITE shows — for_web!A2, which
+    sums the Tweet_log tab. This is the figure "through the last day already
+    written to Tweet_log"; because Tweet_log isn't written until log_tweet()
+    runs (after the card is drawn), daily.py adds the current run's total on
+    top so the card matches what the site will show once the run finishes.
 
-    Primary source: sum the Event Log's "Dollar Estimate" column. This is
-    exactly what Totals!B2 (=SUM('Event Log'!I:I)) computes, but doesn't
-    depend on a tab named "Totals" existing — which is what broke on
-    2026-07-14, when worksheet("Totals") raised WorksheetNotFound and both
-    this card and web_stats.py (which calls this function) fell back to
-    their previously committed figures.
-
-    Secondary source: Totals!B2, if that tab is present. Belt-and-suspenders
-    in case the Event Log is ever renamed.
+    Primary source: for_web!A2 (exactly what the website reads, so the two
+    can never disagree). Fallback: sum the Tweet_log Total Cost column, in
+    case that cell is unreadable.
 
     Returns a positive float, or None if neither source yields one.
     """
@@ -131,24 +134,23 @@ def fetch_cumulative_total():
     client = get_sheet_client()
     spreadsheet = client.open_by_key(sheet_id)
 
-    # Primary: sum the Event Log directly.
+    # Primary: the exact cell the website displays.
     try:
-        total = _total_from_event_log(spreadsheet)
+        total = _read_for_web_cumulative(spreadsheet)
         if total:
             return total
-        print("[OG-CARD] Event Log yielded no positive total — trying Totals!B2.")
+        print("[OG-CARD] for_web!A2 empty/zero — trying the Tweet_log sum.")
     except Exception as e:
-        print(f"[OG-CARD] Event Log sum failed ({e}) — trying Totals!B2.")
+        print(f"[OG-CARD] for_web!A2 unavailable ({e}) — trying the Tweet_log sum.")
 
-    # Secondary: the Totals tab, if it exists under that name.
+    # Fallback: sum Tweet_log directly (the figure for_web!A2 is built from).
     try:
-        raw = spreadsheet.worksheet(TOTALS_TAB).acell("B2").value
-        total = _parse_money(raw)
-        if total and total > 0:
+        total = _sum_tweet_log(spreadsheet)
+        if total:
             return total
-        print(f"[OG-CARD] Totals!B2 empty/zero/unparsable: {raw!r}")
+        print("[OG-CARD] Tweet_log sum yielded no positive total.")
     except Exception as e:
-        print(f"[OG-CARD] Totals!B2 unavailable: {e}")
+        print(f"[OG-CARD] Tweet_log sum failed: {e}")
 
     return None
 
@@ -193,17 +195,24 @@ def render_card(total, out_path=CARD_PATH):
     return out_path
 
 
-def generate_card(out_path=CARD_PATH):
+def generate_card(total=None, out_path=CARD_PATH):
     """
     Fail-safe entry point used by daily.py.
     Returns the card path on success, or None on any failure —
     in which case the previously committed card remains in place.
+
+    daily.py passes `total` — the cumulative figure it has already computed
+    (for_web!A2 + today's run) — so the card matches the number the website
+    will show and the freshly-baked HTML. If `total` is None (e.g. a direct
+    call), the figure is fetched here as a fallback; note that a bare fetch
+    excludes today's run, since Tweet_log isn't written until after the card.
     """
     if not USE_OG_CARD:
         print("[OG-CARD] USE_OG_CARD=false — skipping card regeneration.")
         return None
     try:
-        total = fetch_cumulative_total()
+        if total is None:
+            total = fetch_cumulative_total()
         if total is None:
             return None
         return render_card(total, out_path)
@@ -225,4 +234,4 @@ if __name__ == "__main__":
     if total_arg is not None:
         render_card(total_arg, out_arg)
     else:
-        generate_card(out_arg)
+        generate_card(out_path=out_arg)

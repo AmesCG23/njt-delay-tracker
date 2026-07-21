@@ -521,17 +521,39 @@ def run():
     print(f"[DAILY] Character count: {len(tweet_text)}")
 
     if not DRY_RUN:
+        # ── Cumulative total (must match the website) ────────────────────────
+        # The website shows for_web!A2 = SUM(Tweet_log). Tweet_log isn't
+        # written until log_tweet() below, so right now for_web!A2 is the total
+        # THROUGH YESTERDAY. Add today's cost to get the figure the site will
+        # show once this run's row lands — then feed that one number to BOTH
+        # the social card and the baked HTML, so the card, the freshly baked
+        # page, and the live site all agree. (This is the fix for the card
+        # showing a higher figure than the site — they used to read different
+        # tabs: the Event Log sum vs. for_web/Tweet_log.)
+        # Fail-safe: if the cumulative can't be read, leave it None — the card
+        # falls back to the committed PNG and web_stats keeps its prior value.
+        base_cumulative = None
+        try:
+            from og_card import fetch_cumulative_total
+            base_cumulative = fetch_cumulative_total()
+        except Exception as e:
+            print(f"[DAILY] Cumulative read errored — card/stats will fall back: {e}")
+        cumulative_total = (
+            base_cumulative + totals["total_cost"]
+            if base_cumulative is not None else None
+        )
+
         # ── Social card refresh ──────────────────────────────────────────────
-        # Redraw docs/og-card.png with the live cumulative total (read from
-        # Totals!B2, which already includes today's Event Log rows). The
-        # workflow commits the refreshed file after this script exits, so
-        # GitHub Pages serves it to link scrapers. Fail-safe: on any error
-        # generate_card() returns None and the committed card stays in use.
+        # Redraw docs/og-card.png with cumulative_total (computed just above so
+        # it matches the website). The workflow commits the refreshed file
+        # after this script exits, so GitHub Pages serves it to link scrapers.
+        # Fail-safe: on any error generate_card() returns None and the
+        # committed card stays in use.
         # ⟵ ROLLBACK: USE_OG_CARD=false in daily.yml freezes the card.
         card_path = None
         try:
             from og_card import generate_card
-            card_path = generate_card()
+            card_path = generate_card(total=cumulative_total)
         except Exception as e:
             print(f"[DAILY] Card regeneration errored — using committed card: {e}")
         if card_path is None:
@@ -589,6 +611,7 @@ def run():
                 daily_cost=totals["total_cost"],
                 person_hours=totals["total_person_hours"],
                 report_date=yesterday_et,
+                cumulative=cumulative_total,
             )
         except Exception as e:
             print(f"[DAILY] Web stats refresh errored — committed pages stay as-is: {e}")
