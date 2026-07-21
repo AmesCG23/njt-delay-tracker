@@ -25,9 +25,12 @@ fetches the live Google Sheets values and overwrites the baked text,
 so human visitors always see the freshest numbers; the baked values
 are for everyone reading the raw HTML.
 
-The cumulative total is read from Totals!B2 via og_card's existing
-helper (one extra read-only Sheets call). If that read fails, the
-previously baked cumulative figure simply stays in place.
+The cumulative total is passed in by daily.py — the same figure it
+draws on the social card (for_web!A2 + today's run), so the baked page,
+the card, and the live site all agree. If it isn't passed, this module
+falls back to og_card's fetch_cumulative_total() (which reads for_web!A2,
+what the website itself shows). If neither is available, the previously
+baked cumulative figure simply stays in place.
 
 Fail-safe by design, like the composer and the social card: on ANY
 failure update_web_stats() returns None, the committed pages stay
@@ -177,8 +180,10 @@ def update_web_stats(daily_cost, person_hours, report_date, cumulative=None,
 
     daily_cost / person_hours — the combined day totals already computed
     by the pipeline. report_date — the ET date the figures describe
-    (i.e. "yesterday"). cumulative — pass a number to skip the Sheets
-    read (used by the CLI test mode); None means "fetch Totals!B2".
+    (i.e. "yesterday"). cumulative — daily.py passes the figure it also
+    puts on the social card (for_web!A2 + today), so page and card match;
+    None falls back to fetch_cumulative_total() (for_web!A2). The CLI test
+    mode passes --cumulative directly to skip the Sheets read.
 
     Returns the list of files updated, or None on failure/flag-off —
     in which case the previously committed pages stay in place.
