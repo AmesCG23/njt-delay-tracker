@@ -509,9 +509,7 @@ def run():
     tweet_text = None
     if totals["event_count"] > 0:
         try:
-            tweet_text = compose_post(
-                yesterday_et, totals, morning_totals, evening_totals, all_events
-            )
+            tweet_text = compose_post(yesterday_et, totals, all_events)
         except Exception as e:
             print(f"[DAILY] Composer raised — falling back to template: {e}")
     if not tweet_text:
