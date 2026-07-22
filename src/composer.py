@@ -162,19 +162,30 @@ def _fmt_hours(h):
 
 def _worst_driver(all_events):
     """
-    Human phrase for the biggest single source of lost hours, or None.
+    (phrase, is_systemwide) for the single biggest hours contributor today,
+    or None if there were no events.
 
-    A named rail line comes back as its own name. System-wide events are NOT
-    lines — Penn Station is the NYC gateway (a hub-wide slowdown across every
-    line), and a Hoboken diversion reroutes Midtown Direct service — so they
-    get hub-appropriate phrasing the model can drop into a sentence without
-    implying "the Penn Station line ran late."
+    An ordinary rail line comes back as its own name with is_systemwide=False.
+    Callers should NOT surface that on its own — reporting "this line had the
+    most volume" is mostly just a fact about the line's size: Northeast
+    Corridor, the busiest line by ridership and train frequency, "wins" on
+    raw hours almost any day it has delays at all, which makes that callout
+    repetitive and uninformative rather than a real story.
+
+    Genuine systemwide events come back with is_systemwide=True and
+    hub/suspension-appropriate phrasing: Penn Station is the NYC gateway (a
+    hub-wide slowdown across every line, not a rail line), a Hoboken
+    diversion reroutes Midtown Direct service, and a full line suspension is
+    a distinct, one-off event rather than routine per-train variance. These
+    are the cases worth naming a line/hub for.
     """
     tally = {}
     for ev in all_events:
         line = ev.get("line", "Unknown")
         if ev.get("system_wide") and not ev.get("line_suspension"):
             key = "_hoboken" if line == "System-Wide (Hoboken Diversion)" else "_penn"
+        elif ev.get("system_wide") and ev.get("line_suspension"):
+            key = f"_suspension::{line}"
         else:
             key = line
         hrs = (ev.get("estimated_riders") or 0) * (ev.get("delay_minutes") or 0) / 60
@@ -183,10 +194,12 @@ def _worst_driver(all_events):
         return None
     worst = max(tally, key=tally.get)
     if worst == "_penn":
-        return "system-wide delays into and out of Penn Station"
+        return "system-wide delays into and out of Penn Station", True
     if worst == "_hoboken":
-        return "Midtown Direct trains diverted to Hoboken"
-    return worst  # a named rail line
+        return "Midtown Direct trains diverted to Hoboken", True
+    if worst.startswith("_suspension::"):
+        return f"the {worst.split('::', 1)[1]} suspension", True
+    return worst, False  # an ordinary named rail line — its size, not a story
 
 
 def _heavier_rush(morning_totals, evening_totals):
@@ -235,7 +248,8 @@ def _select_analysis(candidates, last_post_text):
 
 
 def _analysis_candidates(hours, avg_recent, prior, seq, streak_above,
-                         streak_below, is_record, milestone_amt, penn_today):
+                         streak_below, is_record, milestone_amt, penn_today,
+                         systemwide_driver=None):
     """
     The palette of data-commentary detectors. Each returns (salience, phrase,
     signature) when it fires. Only the single highest-salience one is surfaced
@@ -257,6 +271,17 @@ def _analysis_candidates(hours, avg_recent, prior, seq, streak_above,
     if penn_today and penn_k >= 3:
         cand.append((85, f"system-wide Penn Station delays have now hit {penn_k} of the last {penn_n} days",
                      "Penn Station"))
+
+    # Systemwide driver (Penn Station, a Hoboken diversion, or a full line
+    # suspension) — surfaced only when a hub-wide or suspension event is
+    # genuinely the single biggest contributor to the day, never when an
+    # ordinary line (almost always Northeast Corridor, simply because it's
+    # the largest line) happens to have the most volume. Replaces the old
+    # always-offered "hardest hit: <line>" extra, which said nothing new
+    # once it was Northeast Corridor every single day.
+    if systemwide_driver:
+        cand.append((72, f"today's biggest driver was {systemwide_driver}",
+                     "biggest driver"))
 
     # Record chase — longest run of above-average days ever.
     longest_above = _longest_run(seq, lambda v: avg_recent and v > avg_recent)
@@ -415,16 +440,19 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
             assessment, scenario = "an average day", "typical_day"
 
         # Beat 5 — the single sharpest piece of data commentary, chosen from a
-        # palette of detectors (trend / ranking / composition), skipping any
-        # angle that already appeared in the most recent post.
+        # palette of detectors (trend / ranking / composition / systemwide
+        # cause), skipping any angle that already appeared in the most
+        # recent post.
         penn_today = any(
             ev.get("system_wide") and not ev.get("line_suspension")
             and ev.get("line") == "System-Wide (Penn Station)"
             for ev in all_events
         )
+        driver = _worst_driver(all_events)
+        systemwide_driver = driver[0] if driver and driver[1] else None
         candidates = _analysis_candidates(
             hours, avg_recent, prior, seq, streak_above, streak_below,
-            is_record, milestone_amt, penn_today,
+            is_record, milestone_amt, penn_today, systemwide_driver,
         )
         analysis = _select_analysis(candidates, prior[-1].get("text", "") if prior else "")
 
@@ -438,7 +466,6 @@ def compute_stats(yesterday_et, totals, morning_totals, evening_totals,
         "line_count": len(totals.get("lines_affected", [])),
         "avg_hours_str": avg_hours_str,
         "vs_average": vs_average,
-        "worst_driver": _worst_driver(all_events),
         "heavier_rush": _heavier_rush(morning_totals, evening_totals),
         "analysis": analysis,
         "scenario": scenario,
@@ -476,9 +503,13 @@ def build_task_prompt(stats, examples, library, recent_posts=()):
         beat5 = "5. (No standout pattern today — no data-commentary line needed.)"
 
     # Secondary detail — used only if it fits and sharpens the point.
+    # Which line/hub was hit hardest used to live here as an everyday freebie,
+    # but that was almost always Northeast Corridor purely because it's the
+    # biggest line — not a real story. A systemwide cause (Penn Station, a
+    # Hoboken diversion, a full suspension) is now a beat-5 candidate instead
+    # ("biggest driver" in _analysis_candidates), so line/hub commentary only
+    # appears when it's genuinely the day's defining event.
     extras = []
-    if stats.get("worst_driver"):
-        extras.append(f"Hardest hit: {stats['worst_driver']}")
     if stats.get("heavier_rush"):
         extras.append(f"Heavier period: {stats['heavier_rush']}")
     extras_block = "\n".join(f"- {e}" for e in extras) or "- (none)"
@@ -667,7 +698,7 @@ if __name__ == "__main__":
         "cost_str": "$742,040", "hours_str": "16,864 hours",
         "event_count": 30, "line_count": 5,
         "avg_hours_str": "9,400 hours", "vs_average": "about 1.8x the recent average",
-        "worst_driver": "Northeast Corridor", "heavier_rush": "evening rush",
+        "heavier_rush": "evening rush",
         "analysis": "the 3rd-worst day on record", "scenario": "bad_day",
         "must_include": ["16,864 hours", "$742,040"],
         "sufficient_history": True,
