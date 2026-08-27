@@ -504,7 +504,8 @@
       <p class="chart-title">Hours of observed delays, by day</p>
       <p class="chart-desc">
         Person-hours of delay per weekday, sourced from NJ Transit service alerts.
-        Weekends are omitted. Hover over any point for details.
+        Weekends are omitted. Hover over any point for details. The dotted line
+        marks the average delay cost per day.
       </p>
 
       <div class="mini-stats">
@@ -916,6 +917,23 @@
             annotation: {
               annotations: (() => {
                 const acc = {};
+                acc.avgCostLine = {
+                  type: 'line',
+                  yMin: avg,
+                  yMax: avg,
+                  borderColor: 'rgba(107,107,107,0.85)',
+                  borderWidth: 1.5,
+                  borderDash: [6, 4],
+                  label: {
+                    display: true,
+                    content: 'Avg delay cost: ' + formatDollars(String(avg * 44)),
+                    position: 'end',
+                    backgroundColor: 'rgba(107,107,107,0.9)',
+                    color: '#fff',
+                    font: { family: FONT, size: 11 },
+                    padding: { x: 6, y: 3 },
+                  },
+                };
                 METHODOLOGY_CHANGES.forEach((change, i) => {
                   const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === change.after);
                   if (idx === -1) return;
