@@ -45,6 +45,7 @@ from calculator import (
 from aggregator import deduplicate_by_train, calculate_totals
 from logger import log_delay_batch, log_tweet, clear_run_log, log_run, log_run_summary, clear_alert_log, log_alert_batch
 from composer import compose_post
+from federal_holidays import federal_holiday_name
 
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 MIN_DELAY_MINUTES = 10
@@ -428,6 +429,22 @@ def run():
 
     # Determine windows
     yesterday_et, morn_start, morn_end, eve_start, eve_end = get_yesterday_windows()
+
+    # ── Federal holiday check ─────────────────────────────────────────────────
+    # NJ Transit runs a holiday (reduced/Sunday-type) schedule on federal
+    # holidays, not the normal weekday rush-hour service this tracker's whole
+    # methodology assumes. Skip the run entirely rather than fetch, log, and
+    # tweet about a day that isn't a normal commute day — no Sheets writes, no
+    # tweet, and (since clear_run_log/clear_alert_log are also skipped) the
+    # previous real run's audit trail in Run Log / Alert Log is left in place
+    # rather than wiped and replaced with nothing.
+    holiday_name = federal_holiday_name(yesterday_et)
+    if holiday_name:
+        print(f"[DAILY] {yesterday_et} was {holiday_name} (federal holiday) — "
+              f"NJ Transit ran a holiday schedule, not normal weekday rush-hour "
+              f"service. Skipping this run: no fetch, no Sheets writes, no tweet.")
+        print(f"\n[DAILY] Done.\n")
+        return
 
     # ── Clear logs (fresh slate for this run) ────────────────────────────────
     if not DRY_RUN:

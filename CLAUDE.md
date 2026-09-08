@@ -81,7 +81,8 @@ The whole thing runs automatically on GitHub Actions and costs under $1/month to
 │   ├── logger.py                ← writes to Google Sheets (all tabs)
 │   ├── composer.py              ← drafts the daily post with Claude Sonnet
 │   ├── og_card.py               ← redraws docs/og-card.png with the live total
-│   └── web_stats.py             ← bakes daily figures into the static site for non-JS crawlers
+│   ├── web_stats.py             ← bakes daily figures into the static site for non-JS crawlers
+│   └── federal_holidays.py      ← US federal holiday calendar; daily.py skips the run on these dates
 └── .github/workflows/
     ├── daily.yml                ← automated daily run, Tue–Sat at 12:30 UTC (~8:30am ET)
     └── benchmark.yml            ← manual dry-run against any historical date
@@ -105,6 +106,14 @@ When the script runs on Tuesday at ~8:30am ET, it fetches Monday's alerts. It ca
 
 - **Morning rush:** 5:00 AM – 10:30 AM Eastern Time (yesterday)
 - **Evening rush:** 3:00 PM – 8:30 PM Eastern Time (yesterday)
+
+### Federal holidays are skipped (added September 2026)
+
+The `cron` schedule itself has no concept of holidays — it just fires Tuesday–Saturday every week, so the Tuesday after Labor Day still fires and would otherwise fetch Monday's (Labor Day's) alerts. NJ Transit runs a holiday (reduced/Sunday-type) schedule on federal holidays, not the normal weekday rush-hour service the tracker's whole cost methodology assumes — so a "yesterday" that was a federal holiday isn't a normal commute day to measure or post about.
+
+`src/daily.py`'s `run()` checks `yesterday_et` against `src/federal_holidays.py` right after computing the windows. If it lands on one of the 11 US federal holidays, the run stops immediately and logs why — no Bluesky fetch, no Sheets writes, no tweet, no site bake. (Run Log / Alert Log are also left untouched rather than wiped, so they still show the last real run's audit trail instead of an empty one.) `src/federal_holidays.py` computes the calendar itself (no third-party `holidays` package) using the standard weekday-of-month rules (MLK Day, Presidents Day, Memorial Day, Labor Day, Columbus Day, Thanksgiving) and fixed-date-with-observed-shift rules (New Year's, Juneteenth, Independence Day, Veterans Day, Christmas) — including the year-boundary case where a January 1 that falls on a Saturday is observed on the preceding December 31.
+
+This check runs regardless of `OVERRIDE_DATE`, so it's also how you test it: `OVERRIDE_DATE=2026-09-07 DRY_RUN=true python src/daily.py` (2026-09-07 was Labor Day) should print the skip message and exit without any network calls.
 
 ### The five pipeline stages (per window)
 
