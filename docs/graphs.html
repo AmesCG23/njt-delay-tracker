@@ -499,19 +499,19 @@
       </div>
     </div>
 
-    <!-- Featured chart: Hours of delay over time (real data) -->
+    <!-- Featured chart: Hours/cost of delay over time (real data) -->
     <div class="chart-section">
-      <p class="chart-title">Hours of observed delays, by day</p>
+      <p class="chart-title">Observed delays, by day</p>
       <p class="chart-desc">
-        Person-hours of delay per weekday, sourced from NJ Transit service alerts.
-        Weekends are omitted. Hover over any point for details. The dotted line
-        marks the average delay cost per day.
+        Person-hours or estimated dollar cost of delay per weekday &mdash; toggle below &mdash;
+        sourced from NJ Transit service alerts. Weekends are omitted. Hover over any point
+        for details. The dotted line marks the average per day.
       </p>
 
       <div class="mini-stats">
         <div class="mini-stat">
           <span class="ms-val" id="ms-avg">&mdash;</span>
-          <span class="ms-label">avg hrs / day</span>
+          <span class="ms-label" id="ms-avg-label">avg hrs / day</span>
         </div>
         <div class="mini-stat">
           <span class="ms-val" id="ms-peak">&mdash;</span>
@@ -519,7 +519,7 @@
         </div>
         <div class="mini-stat">
           <span class="ms-val" id="ms-total">&mdash;</span>
-          <span class="ms-label">total person-hrs</span>
+          <span class="ms-label" id="ms-total-label">total person-hrs</span>
         </div>
         <div class="mini-stat">
           <span class="ms-val" id="ms-days">&mdash;</span>
@@ -529,6 +529,8 @@
 
       <div class="chart-controls">
         <div class="btn-group">
+          <button class="ctrl-btn active" id="btn-metric-hours" disabled title="Show person-hours of delay">Hours</button>
+          <button class="ctrl-btn" id="btn-metric-cost" disabled title="Show estimated dollar cost of delay">Cost</button>
           <button class="ctrl-btn" id="btn-ma" disabled title="Toggle 3-day centered moving average">3-day avg</button>
         </div>
         <div class="btn-group">
@@ -608,6 +610,18 @@
       const num = parseFloat(cleaned);
       if (isNaN(num)) return '$—';
       return '$' + Math.round(num).toLocaleString('en-US');
+    }
+
+    // Every dollar figure this project computes is person-hours x this rate
+    // (see calculator.py — VTTS_RATE), so the Cost view is derived client-side
+    // from the same person-hours already pulled from Tweet_log, not a second
+    // sheet column. That also means Cost covers the same date range as Hours.
+    const VTTS_RATE = 44;
+
+    function formatMetricValue(value, metric) {
+      return metric === 'cost'
+        ? formatDollars(String(value))
+        : Math.round(value).toLocaleString('en-US') + ' hrs';
     }
 
     function formatInteger(raw) {
@@ -800,46 +814,55 @@
     // ============================================================
     // STATS PANEL
     // ============================================================
-    function populateStats(data) {
-      const hrs  = data.map(d => d.hours);
-      const avg  = hrs.reduce((s, v) => s + v, 0) / hrs.length;
-      const max  = Math.max(...hrs);
-      const peak = data[hrs.indexOf(max)];
-      const tot  = hrs.reduce((s, v) => s + v, 0);
+    function populateStats(data, metric) {
+      const vals = data.map(d => metric === 'cost' ? d.hours * VTTS_RATE : d.hours);
+      const avg  = vals.reduce((s, v) => s + v, 0) / vals.length;
+      const max  = Math.max(...vals);
+      const peak = data[vals.indexOf(max)];
+      const tot  = vals.reduce((s, v) => s + v, 0);
 
-      document.getElementById('ms-avg').textContent  =
-        avg.toLocaleString('en-US', { maximumFractionDigits: 0 });
-      document.getElementById('ms-peak').textContent =
-        max.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      const fmt = metric === 'cost'
+        ? v => formatDollars(String(v))
+        : v => v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+      document.getElementById('ms-avg').textContent  = fmt(avg);
+      document.getElementById('ms-avg-label').textContent =
+        metric === 'cost' ? 'avg cost / day' : 'avg hrs / day';
+      document.getElementById('ms-peak').textContent = fmt(max);
       document.getElementById('ms-peak-label').textContent =
         'peak (' + fmtLabel(peak.date) + ')';
-      document.getElementById('ms-total').textContent =
-        tot.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      document.getElementById('ms-total').textContent = fmt(tot);
+      document.getElementById('ms-total-label').textContent =
+        metric === 'cost' ? 'total cost' : 'total person-hrs';
       document.getElementById('ms-days').textContent = data.length;
     }
 
     // ============================================================
     // CUSTOM TOOLTIP
     // ============================================================
-    function makeTooltipHandler(data, avg) {
+    function makeTooltipHandler(data, avg, metric) {
       return function({ chart, tooltip }) {
         const el = document.getElementById('tooltip-hours');
         if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
 
-        const i  = tooltip.dataPoints[0].dataIndex;
-        const pt = data[i];
+        const i   = tooltip.dataPoints[0].dataIndex;
+        const pt  = data[i];
+        const val = metric === 'cost' ? pt.hours * VTTS_RATE : pt.hours;
         const pct = avg > 0
-          ? Math.round((pt.hours - avg) / avg * 100)
+          ? Math.round((val - avg) / avg * 100)
           : 0;
         const vs = pct === 0
           ? 'at average'
           : Math.abs(pct) + '% ' + (pct > 0 ? 'above' : 'below') + ' average';
         const onTime = pt.hours === 0;
+        const valueLabel = metric === 'cost'
+          ? formatDollars(String(val))
+          : val.toLocaleString('en-US') + ' person-hours';
 
         el.innerHTML =
-          '<div class="tt-date">'    + fmtFull(pt.date)                          + '</div>' +
-          '<div class="tt-value">'   + pt.hours.toLocaleString('en-US') + ' person-hours' + '</div>' +
-          '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs)          + '</div>';
+          '<div class="tt-date">'    + fmtFull(pt.date)                 + '</div>' +
+          '<div class="tt-value">'   + valueLabel                       + '</div>' +
+          '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs) + '</div>';
 
         // Position relative to chart-wrap-main
         const wrap      = document.getElementById('wrap-hours');
@@ -858,20 +881,31 @@
     // ============================================================
     // LINE CHART
     // ============================================================
-    let hoursChart = null;
-    let showMA     = false;
+    let hoursChart  = null;
+    let showMA      = false;
+    let metricView  = 'hours';   // 'hours' | 'cost'
 
-    function buildChart(data) {
+    function metricValues(data, metric) {
+      return data.map(d => metric === 'cost' ? d.hours * VTTS_RATE : d.hours);
+    }
+
+    function buildChart(data, metric) {
       const isMobile = window.innerWidth <= 600;
       const canvas = document.getElementById('chart-hours');
       const ctx    = canvas.getContext('2d');
+
+      if (hoursChart) hoursChart.destroy();
+
+      canvas.setAttribute('aria-label', metric === 'cost'
+        ? 'Line chart of estimated dollar cost of NJ Transit delay per weekday. Use the Export CSV button for the underlying data.'
+        : 'Line chart of person-hours of NJ Transit delay per weekday. Use the Export CSV button for the underlying data.');
 
       const grad = ctx.createLinearGradient(0, 0, 0, 340);
       grad.addColorStop(0, 'rgba(43,76,126,0.16)');
       grad.addColorStop(1, 'rgba(43,76,126,0)');
 
       const labels = data.map(d => d.label);
-      const values = data.map(d => d.hours);
+      const values = metricValues(data, metric);
       const avg    = values.reduce((s, v) => s + v, 0) / values.length;
 
       hoursChart = new Chart(ctx, {
@@ -880,7 +914,7 @@
           labels,
           datasets: [
             {
-              label: 'Person-hours of delay',
+              label: metric === 'cost' ? 'Cost of delay' : 'Person-hours of delay',
               data: values,
               borderColor: ACCENT,
               backgroundColor: grad,
@@ -895,7 +929,7 @@
             },
             {
               label: '3-day avg',
-              data: [],            // populated when toggle is on
+              data: showMA ? centeredMA(values, 1) : [],
               borderColor: 'rgba(43,76,126,0.38)',
               backgroundColor: 'transparent',
               fill: false,
@@ -913,7 +947,7 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { display: false },
-            tooltip: { enabled: false, external: makeTooltipHandler(data, avg) },
+            tooltip: { enabled: false, external: makeTooltipHandler(data, avg, metric) },
             annotation: {
               annotations: (() => {
                 const acc = {};
@@ -926,7 +960,7 @@
                   borderDash: [6, 4],
                   label: {
                     display: true,
-                    content: 'Avg delay cost: ' + formatDollars(String(avg * 44)),
+                    content: 'Avg: ' + formatMetricValue(avg, metric),
                     position: 'end',
                     backgroundColor: 'rgba(107,107,107,0.9)',
                     color: '#fff',
@@ -995,15 +1029,17 @@
               beginAtZero: true,
               title: {
                 display: true,
-                text: 'Person-hours',
+                text: metric === 'cost' ? 'Cost ($)' : 'Person-hours',
                 font: { family: FONT, size: 12 },
                 color: '#6b6b6b',
               },
               ticks: {
                 font: { family: FONT, size: 12 },
-                callback: v => isMobile
-                  ? (v >= 1000 ? (v / 1000) + 'k' : v)
-                  : v.toLocaleString('en-US'),
+                callback: v => {
+                  const short = v >= 1000 ? (v / 1000) + 'k' : v;
+                  if (metric === 'cost') return '$' + (isMobile ? short : v.toLocaleString('en-US'));
+                  return isMobile ? short : v.toLocaleString('en-US');
+                },
               },
             },
           },
@@ -1126,6 +1162,20 @@
     }
 
     // ============================================================
+    // CONTROLS: hours / cost toggle
+    // ============================================================
+    function setMetric(metric) {
+      if (metric === metricView || !rawData.length) return;
+      metricView = metric;
+      document.getElementById('btn-metric-hours').classList.toggle('active', metric === 'hours');
+      document.getElementById('btn-metric-cost').classList.toggle('active', metric === 'cost');
+      populateStats(rawData, metricView);
+      buildChart(rawData, metricView);
+    }
+    document.getElementById('btn-metric-hours').addEventListener('click', () => setMetric('hours'));
+    document.getElementById('btn-metric-cost').addEventListener('click', () => setMetric('cost'));
+
+    // ============================================================
     // CONTROLS: moving average toggle
     // ============================================================
     document.getElementById('btn-ma').addEventListener('click', function () {
@@ -1133,7 +1183,7 @@
       this.classList.toggle('active', showMA);
       if (hoursChart) {
         hoursChart.data.datasets[1].data =
-          showMA ? centeredMA(rawData.map(d => d.hours), 1) : [];
+          showMA ? centeredMA(metricValues(rawData, metricView), 1) : [];
         hoursChart.update();
       }
     });
@@ -1143,15 +1193,17 @@
     // ============================================================
     document.getElementById('btn-csv').addEventListener('click', function () {
       if (!rawData.length) return;
-      const rows = ['Date,Person-Hours'];
+      const isCost = metricView === 'cost';
+      const rows = [isCost ? 'Date,Cost ($)' : 'Date,Person-Hours'];
       rawData.forEach(d => {
         const iso = d.date.toISOString().slice(0, 10);
-        rows.push(iso + ',' + d.hours);
+        const val = isCost ? Math.round(d.hours * VTTS_RATE) : d.hours;
+        rows.push(iso + ',' + val);
       });
       const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
       const a    = document.createElement('a');
       a.href     = URL.createObjectURL(blob);
-      a.download = 'njt-delay-hours.csv';
+      a.download = isCost ? 'njt-delay-cost.csv' : 'njt-delay-hours.csv';
       a.click();
       URL.revokeObjectURL(a.href);
     });
@@ -1163,7 +1215,7 @@
       if (!hoursChart) return;
       const a    = document.createElement('a');
       a.href     = hoursChart.toBase64Image('image/png', 1);
-      a.download = 'njt-delay-hours.png';
+      a.download = metricView === 'cost' ? 'njt-delay-cost.png' : 'njt-delay-hours.png';
       a.click();
     });
 
@@ -1197,11 +1249,11 @@
         status.style.display = 'none';
         canvas.style.display = 'block';
 
-        populateStats(rawData);
-        buildChart(rawData);
+        populateStats(rawData, metricView);
+        buildChart(rawData, metricView);
 
         // Enable controls now that data is loaded
-        ['btn-ma', 'btn-csv', 'btn-png'].forEach(id => {
+        ['btn-metric-hours', 'btn-metric-cost', 'btn-ma', 'btn-csv', 'btn-png'].forEach(id => {
           document.getElementById(id).disabled = false;
         });
       } catch (err) {
