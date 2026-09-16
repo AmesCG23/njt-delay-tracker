@@ -612,16 +612,17 @@
       return '$' + Math.round(num).toLocaleString('en-US');
     }
 
-    // Every dollar figure this project computes is person-hours x this rate
-    // (see calculator.py — VTTS_RATE), so the Cost view is derived client-side
-    // from the same person-hours already pulled from Tweet_log, not a second
-    // sheet column. That also means Cost covers the same date range as Hours.
-    const VTTS_RATE = 44;
-
     function formatMetricValue(value, metric) {
       return metric === 'cost'
         ? formatDollars(String(value))
         : Math.round(value).toLocaleString('en-US') + ' hrs';
+    }
+
+    // The Cost view reads each day's actual recorded dollar total (column C)
+    // rather than approximating it as hours x $44 — see the note in
+    // loadTweetLog() for why that approximation drifted from the real total.
+    function metricValue(d, metric) {
+      return metric === 'cost' ? d.cost : d.hours;
     }
 
     function formatInteger(raw) {
@@ -752,7 +753,14 @@
         const hours = parseFloat((cols[6] || '').replace(/[,$"\s]/g, ''));
         if (isNaN(hours)) continue;
 
-        points.push({ date, hours, label: fmtLabel(date) });
+        // Column C: the actual dollar total the pipeline calculated for that day,
+        // from the exact (pre-rounding) delay time. Reading it directly — rather
+        // than approximating cost as hours x $44 — keeps the Cost view exactly in
+        // sync with the site's headline cumulative total, since G (person-hours)
+        // is rounded to the nearest whole hour before being saved, but C isn't.
+        const cost = parseFloat((cols[2] || '').replace(/[,$"\s]/g, ''));
+
+        points.push({ date, hours, cost, label: fmtLabel(date) });
 
         // Count days where I or J is non-empty — meaning the row was written
         // with the morning/evening cost columns (added after initial launch).
@@ -815,7 +823,7 @@
     // STATS PANEL
     // ============================================================
     function populateStats(data, metric) {
-      const vals = data.map(d => metric === 'cost' ? d.hours * VTTS_RATE : d.hours);
+      const vals = data.map(d => metricValue(d, metric));
       const avg  = vals.reduce((s, v) => s + v, 0) / vals.length;
       const max  = Math.max(...vals);
       const peak = data[vals.indexOf(max)];
@@ -847,7 +855,7 @@
 
         const i   = tooltip.dataPoints[0].dataIndex;
         const pt  = data[i];
-        const val = metric === 'cost' ? pt.hours * VTTS_RATE : pt.hours;
+        const val = metricValue(pt, metric);
         const pct = avg > 0
           ? Math.round((val - avg) / avg * 100)
           : 0;
@@ -886,7 +894,7 @@
     let metricView  = 'hours';   // 'hours' | 'cost'
 
     function metricValues(data, metric) {
-      return data.map(d => metric === 'cost' ? d.hours * VTTS_RATE : d.hours);
+      return data.map(d => metricValue(d, metric));
     }
 
     function buildChart(data, metric) {
@@ -1197,7 +1205,7 @@
       const rows = [isCost ? 'Date,Cost ($)' : 'Date,Person-Hours'];
       rawData.forEach(d => {
         const iso = d.date.toISOString().slice(0, 10);
-        const val = isCost ? Math.round(d.hours * VTTS_RATE) : d.hours;
+        const val = isCost ? Math.round(d.cost) : d.hours;
         rows.push(iso + ',' + val);
       });
       const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
