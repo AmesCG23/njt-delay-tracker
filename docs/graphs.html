@@ -390,6 +390,27 @@
       margin-top: 0.1rem;
     }
 
+    /* === AVERAGE-LINE HOVER BADGE ===
+       Shown only while hovering the dashed average line. Fixed in the
+       corner rather than pinned to the line itself, so it never sits on
+       top of the plotted data. */
+    .avg-badge {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.75rem;
+      background: rgba(107,107,107,0.92);
+      color: #fff;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 0.78rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 2px;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 6;
+      transition: opacity 0.12s;
+      opacity: 0;
+    }
+
     /* === LOADING / ERROR === */
     .chart-status {
       position: absolute;
@@ -532,6 +553,7 @@
           <button class="ctrl-btn active" id="btn-metric-hours" disabled title="Show person-hours of delay">Hours</button>
           <button class="ctrl-btn" id="btn-metric-cost" disabled title="Show estimated dollar cost of delay">Cost</button>
           <button class="ctrl-btn" id="btn-ma" disabled title="Toggle 3-day centered moving average">3-day avg</button>
+          <button class="ctrl-btn" id="btn-events" disabled title="Show notable dates (methodology changes, incidents) as marker lines">Display events</button>
         </div>
         <div class="btn-group">
           <button class="ctrl-btn" id="btn-csv" disabled title="Download underlying data as CSV">&darr; Export CSV</button>
@@ -541,6 +563,7 @@
 
       <div class="chart-wrap-main" id="wrap-hours">
         <div class="chart-tooltip" id="tooltip-hours"></div>
+        <div class="avg-badge" id="avg-badge"></div>
         <div class="chart-status" id="status-hours">Loading delay data&hellip;</div>
         <canvas id="chart-hours" style="display:none;" role="img" aria-label="Line chart of person-hours of NJ Transit delay per weekday. Use the Export CSV button for the underlying data."></canvas>
       </div>
@@ -593,10 +616,27 @@
     const PUBLISHED_ID = '2PACX-1vTrFqV87cB3GMw8D-O-Eg0egHZv0hg5sBCe7uqaZErgeajmyVRunQzGu5V6WV7HTPxkVs4HpTqVnqce';
     const SHEET_GID    = '1868128114';
 
-    const METHODOLOGY_CHANGES = [
-      { after: '2026-05-01', label: 'Methodology v2.0' },
-    ];
-    const INCIDENT_MARKERS = [
+    // ============================================================
+    // CHART EVENTS — vertical marker lines on the trend chart
+    // ------------------------------------------------------------
+    // To mark a new date on the chart, just add an entry here. Nothing
+    // else needs to change. Shown/hidden together via the "Display
+    // events" button (off by default).
+    //
+    //   date             — YYYY-MM-DD, the report date (Eastern Time)
+    //                       this event is tied to.
+    //   label            — short text shown on the line.
+    //   effectiveNextDay — optional. Set true for a change that took
+    //                       effect the day AFTER `date` (e.g. a
+    //                       methodology change applied starting the next
+    //                       business day) — the line is drawn between
+    //                       that day and the next. Omit for something
+    //                       that happened ON `date` itself (an incident,
+    //                       an outage) — the line is drawn right at that
+    //                       day's point.
+    // ============================================================
+    const CHART_EVENTS = [
+      { date: '2026-05-01', label: 'Methodology v2.0', effectiveNextDay: true },
       { date: '2026-05-29', label: 'Penn Station fire injures 5' },
     ];
     // ============================================================
@@ -892,6 +932,7 @@
     let hoursChart  = null;
     let showMA      = false;
     let metricView  = 'hours';   // 'hours' | 'cost'
+    let showEvents  = false;     // vertical marker lines — off by default
 
     function metricValues(data, metric) {
       return data.map(d => metricValue(d, metric));
@@ -903,6 +944,7 @@
       const ctx    = canvas.getContext('2d');
 
       if (hoursChart) hoursChart.destroy();
+      document.getElementById('avg-badge').style.opacity = '0';
 
       canvas.setAttribute('aria-label', metric === 'cost'
         ? 'Line chart of estimated dollar cost of NJ Transit delay per weekday. Use the Export CSV button for the underlying data.'
@@ -959,6 +1001,7 @@
             annotation: {
               annotations: (() => {
                 const acc = {};
+                const avgBadge = document.getElementById('avg-badge');
                 acc.avgCostLine = {
                   type: 'line',
                   yMin: avg,
@@ -966,58 +1009,42 @@
                   borderColor: 'rgba(107,107,107,0.85)',
                   borderWidth: 1.5,
                   borderDash: [6, 4],
-                  label: {
-                    display: true,
-                    content: 'Avg: ' + formatMetricValue(avg, metric),
-                    position: 'end',
-                    backgroundColor: 'rgba(107,107,107,0.9)',
-                    color: '#fff',
-                    font: { family: FONT, size: 11 },
-                    padding: { x: 6, y: 3 },
+                  label: { display: false },
+                  // The average number only appears on hover, in a fixed
+                  // corner badge (see .avg-badge) — not pinned to the line
+                  // itself, so it never sits on top of the plotted data.
+                  enter() {
+                    avgBadge.textContent = 'Avg: ' + formatMetricValue(avg, metric);
+                    avgBadge.style.opacity = '1';
+                  },
+                  leave() {
+                    avgBadge.style.opacity = '0';
                   },
                 };
-                METHODOLOGY_CHANGES.forEach((change, i) => {
-                  const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === change.after);
-                  if (idx === -1) return;
-                  acc['method' + i] = {
-                    type: 'line',
-                    xMin: idx + 0.5,
-                    xMax: idx + 0.5,
-                    borderColor: 'rgba(180, 40, 40, 0.8)',
-                    borderWidth: 2,
-                    borderDash: [5, 3],
-                    label: {
-                      display: true,
-                      content: change.label,
-                      position: 'end',
-                      backgroundColor: 'rgba(180, 40, 40, 0.85)',
-                      color: '#fff',
-                      font: { family: FONT, size: 11 },
-                      padding: { x: 6, y: 3 },
-                    },
-                  };
-                });
-                INCIDENT_MARKERS.forEach((marker, i) => {
-                  const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === marker.date);
-                  if (idx === -1) return;
-                  acc['incident' + i] = {
-                    type: 'line',
-                    xMin: idx,
-                    xMax: idx,
-                    borderColor: 'rgba(180, 40, 40, 0.8)',
-                    borderWidth: 2,
-                    borderDash: [5, 3],
-                    label: {
-                      display: true,
-                      content: marker.label,
-                      position: 'end',
-                      backgroundColor: 'rgba(180, 40, 40, 0.85)',
-                      color: '#fff',
-                      font: { family: FONT, size: 11 },
-                      padding: { x: 6, y: 3 },
-                    },
-                  };
-                });
+                if (showEvents) {
+                  CHART_EVENTS.forEach((evt, i) => {
+                    const idx = data.findIndex(d => d.date.toISOString().slice(0, 10) === evt.date);
+                    if (idx === -1) return;
+                    const x = evt.effectiveNextDay ? idx + 0.5 : idx;
+                    acc['event' + i] = {
+                      type: 'line',
+                      xMin: x,
+                      xMax: x,
+                      borderColor: 'rgba(180, 40, 40, 0.8)',
+                      borderWidth: 2,
+                      borderDash: [5, 3],
+                      label: {
+                        display: true,
+                        content: evt.label,
+                        position: 'end',
+                        backgroundColor: 'rgba(180, 40, 40, 0.85)',
+                        color: '#fff',
+                        font: { family: FONT, size: 11 },
+                        padding: { x: 6, y: 3 },
+                      },
+                    };
+                  });
+                }
                 return acc;
               })(),
             },
@@ -1184,6 +1211,15 @@
     document.getElementById('btn-metric-cost').addEventListener('click', () => setMetric('cost'));
 
     // ============================================================
+    // CONTROLS: display events toggle (vertical marker lines)
+    // ============================================================
+    document.getElementById('btn-events').addEventListener('click', function () {
+      showEvents = !showEvents;
+      this.classList.toggle('active', showEvents);
+      if (rawData.length) buildChart(rawData, metricView);
+    });
+
+    // ============================================================
     // CONTROLS: moving average toggle
     // ============================================================
     document.getElementById('btn-ma').addEventListener('click', function () {
@@ -1261,7 +1297,7 @@
         buildChart(rawData, metricView);
 
         // Enable controls now that data is loaded
-        ['btn-metric-hours', 'btn-metric-cost', 'btn-ma', 'btn-csv', 'btn-png'].forEach(id => {
+        ['btn-metric-hours', 'btn-metric-cost', 'btn-ma', 'btn-events', 'btn-csv', 'btn-png'].forEach(id => {
           document.getElementById(id).disabled = false;
         });
       } catch (err) {
