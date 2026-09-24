@@ -423,6 +423,155 @@
       font-style: italic;
     }
 
+    /* === CALENDAR VIEW ===
+       Alternate view of the featured chart: one cell per weekday, colored
+       by how that day compares with the all-time daily average. The colors
+       live in CAL_BINS in the script; the classes here only handle layout
+       and the no-data / not-yet-reported states. */
+    .ctrl-btn.hidden { display: none; }
+
+    .cal-wrap {
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 1rem 1rem 1.1rem;
+    }
+
+    .cal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.2rem;
+    }
+
+    .cal-month {
+      font-size: 1.25rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .cal-nav {
+      font-size: 1rem;
+      min-width: 2.4rem;
+    }
+
+    .cal-summary {
+      font-size: 0.85rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      text-align: center;
+      margin-bottom: 0.8rem;
+      min-height: 1.2em;
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+
+    .cal-dow {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-faint);
+      text-align: center;
+      padding-bottom: 0.15rem;
+    }
+
+    .cal-day {
+      aspect-ratio: 1.5 / 1;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      padding: 0.3rem 0.4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-family: 'EB Garamond', Georgia, serif;
+      text-align: left;
+      color: var(--ink);
+      background: transparent;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    button.cal-day { cursor: pointer; }
+
+    button.cal-day:hover,
+    button.cal-day:focus-visible,
+    button.cal-day.selected {
+      outline: 2px solid var(--ink);
+      outline-offset: 1px;
+    }
+
+    .cal-num {
+      font-size: 0.8rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .cal-val {
+      font-size: 0.9rem;
+      font-weight: 600;
+      line-height: 1;
+      align-self: flex-end;
+      white-space: nowrap;
+    }
+
+    .cal-day.nodata {
+      background: repeating-linear-gradient(45deg, #f4f3f1, #f4f3f1 4px, #e7e5e1 4px, #e7e5e1 8px);
+      color: var(--ink-faint);
+    }
+
+    .cal-day.pending {
+      border: 1px dashed var(--rule);
+      color: var(--ink-faint);
+    }
+
+    .cal-detail {
+      font-size: 0.9rem;
+      text-align: center;
+      margin-top: 0.8rem;
+      min-height: 2.6em;
+      color: var(--ink-light);
+    }
+
+    .cal-detail strong { color: var(--ink); }
+
+    .cal-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.35rem 0.9rem;
+      margin-top: 0.6rem;
+      padding-top: 0.7rem;
+      border-top: 1px solid var(--rule);
+      font-size: 0.78rem;
+      color: var(--ink-light);
+    }
+
+    .cal-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      white-space: nowrap;
+    }
+
+    .cal-swatch {
+      width: 0.95rem;
+      height: 0.95rem;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .cal-note {
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+
     /* === REDUCED MOTION === */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -467,6 +616,26 @@
         font-size: 0.78rem;
         padding: 0.25rem 0.55rem;
       }
+
+      .btn-group {
+        flex-wrap: wrap;
+      }
+
+      .cal-wrap {
+        padding: 0.75rem 0.5rem 0.9rem;
+      }
+
+      .cal-grid {
+        gap: 3px;
+      }
+
+      .cal-day {
+        aspect-ratio: 1 / 1;
+        padding: 0.2rem 0.25rem;
+      }
+
+      .cal-num { font-size: 0.72rem; }
+      .cal-val { font-size: 0.72rem; }
 
       footer {
         padding: 1rem 1.25rem;
@@ -525,8 +694,9 @@
       <p class="chart-title">Observed delays, by day</p>
       <p class="chart-desc">
         Person-hours or estimated dollar cost of delay per weekday &mdash; toggle below &mdash;
-        sourced from NJ Transit service alerts. Weekends are omitted. Hover over any point
-        for details. The dotted line marks the average per day.
+        sourced from NJ Transit service alerts. Weekends are omitted. The calendar colors each
+        weekday against the average day; hover over or tap a day for details. Switch to the
+        line chart to see the full trend at once.
       </p>
 
       <div class="mini-stats">
@@ -550,6 +720,10 @@
 
       <div class="chart-controls">
         <div class="btn-group">
+          <button class="ctrl-btn active" id="btn-view-line" disabled title="Show the day-by-day line chart">Line chart</button>
+          <button class="ctrl-btn" id="btn-view-cal" disabled title="Show a month-by-month calendar, color-coded against the daily average">Calendar</button>
+        </div>
+        <div class="btn-group">
           <button class="ctrl-btn active" id="btn-metric-hours" disabled title="Show person-hours of delay">Hours</button>
           <button class="ctrl-btn" id="btn-metric-cost" disabled title="Show estimated dollar cost of delay">Cost</button>
           <button class="ctrl-btn" id="btn-ma" disabled title="Toggle 3-day centered moving average">3-day avg</button>
@@ -566,6 +740,22 @@
         <div class="avg-badge" id="avg-badge"></div>
         <div class="chart-status" id="status-hours">Loading delay data&hellip;</div>
         <canvas id="chart-hours" style="display:none;" role="img" aria-label="Line chart of person-hours of NJ Transit delay per weekday. Use the Export CSV button for the underlying data."></canvas>
+      </div>
+
+      <!-- Calendar view: same data as the line chart, one cell per weekday.
+           Hidden until the "Calendar" button is pressed; filled in by
+           renderCalendar() in the script below. -->
+      <div class="cal-wrap" id="wrap-cal" hidden>
+        <div class="cal-head">
+          <button class="ctrl-btn cal-nav" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+          <div class="cal-month" id="cal-month" aria-live="polite"></div>
+          <button class="ctrl-btn cal-nav" id="cal-next" aria-label="Next month">&rsaquo;</button>
+        </div>
+        <p class="cal-summary" id="cal-summary"></p>
+        <div class="cal-grid" id="cal-grid"></div>
+        <p class="cal-detail" id="cal-detail" aria-live="polite"></p>
+        <div class="cal-legend" id="cal-legend"></div>
+        <p class="cal-note" id="cal-note"></p>
       </div>
     </div>
 
@@ -1197,6 +1387,241 @@
     }
 
     // ============================================================
+    // CALENDAR VIEW — one cell per weekday, colored vs. the average
+    // ------------------------------------------------------------
+    // Each day is compared with the all-time daily average of the
+    // selected measure (the same average the line chart's dotted line
+    // shows), as a ratio: 1.0 = exactly average, 2.0 = twice average.
+    // CAL_BINS maps that ratio to a color. To adjust the cutoffs or
+    // colors, edit this list only — the legend is built from it.
+    //   maxRatio — upper bound of the bin (the day's ratio must be below it)
+    //   text     — label color that stays readable on that background
+    // ============================================================
+    const CAL_BINS = [
+      { maxRatio: 1e-9,     color: '#1b7837', text: '#fff',    label: 'No delays' },
+      { maxRatio: 0.5,      color: '#5aae61', text: '#1a1a1a', label: 'Well below average' },
+      { maxRatio: 0.8,      color: '#b8e0a8', text: '#1a1a1a', label: 'Below average' },
+      { maxRatio: 1.2,      color: '#f6d44b', text: '#1a1a1a', label: 'About average' },
+      { maxRatio: 1.75,     color: '#f4a340', text: '#1a1a1a', label: 'Above average' },
+      { maxRatio: 2.5,      color: '#c43c20', text: '#fff',    label: 'Well above average' },
+      { maxRatio: Infinity, color: '#7a1010', text: '#fff',    label: 'Severe (2.5× average or more)' },
+    ];
+
+    // Earliest month the calendar can page back to.
+    const CAL_FIRST_MONTH = { year: 2026, month: 3 };   // month is 0-based: 3 = April
+
+    const MONTH_NAMES = ['January','February','March','April','May','June',
+                         'July','August','September','October','November','December'];
+
+    let viewMode  = 'line';   // 'line' | 'calendar'
+    let calYear   = null;     // month currently shown in the calendar
+    let calMonth  = null;
+    let calByDate = new Map();   // 'YYYY-MM-DD' -> data point
+    let calLatest = null;        // most recent date with data
+
+    function dateKey(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    function calBin(ratio) {
+      return CAL_BINS.find(b => ratio < b.maxRatio) || CAL_BINS[CAL_BINS.length - 1];
+    }
+
+    // Short figure that fits inside a calendar cell: "5.8k", "$255K", "$1.2M"
+    function compactValue(v, metric) {
+      if (metric === 'cost') {
+        if (v < 1000)    return '$' + Math.round(v);
+        if (v < 999500)  return '$' + Math.round(v / 1000) + 'K';
+        return '$' + (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+      }
+      if (v < 1000) return String(Math.round(v));
+      return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    }
+
+    function compareToAvg(val, avg) {
+      if (val === 0) return 'NJT ran on time';
+      const pct = avg > 0 ? Math.round((val - avg) / avg * 100) : 0;
+      if (pct === 0) return 'right at the average';
+      return Math.abs(pct) + '% ' + (pct > 0 ? 'above' : 'below') + ' average';
+    }
+
+    function prepareCalendar(data) {
+      calByDate = new Map();
+      data.forEach(d => calByDate.set(dateKey(d.date), d));   // a re-run row for the same date replaces the earlier one
+      calLatest = data[data.length - 1].date;
+      calYear   = calLatest.getFullYear();
+      calMonth  = calLatest.getMonth();
+    }
+
+    function buildCalLegend(avg, metric) {
+      const legend = document.getElementById('cal-legend');
+      legend.innerHTML = '';
+      CAL_BINS.forEach(b => {
+        const item = document.createElement('span');
+        item.className = 'cal-legend-item';
+        item.innerHTML = '<span class="cal-swatch" style="background:' + b.color + '"></span>' + b.label;
+        legend.appendChild(item);
+      });
+      const nd = document.createElement('span');
+      nd.className = 'cal-legend-item';
+      nd.innerHTML = '<span class="cal-swatch cal-day nodata" style="padding:0;aspect-ratio:auto"></span>No data';
+      legend.appendChild(nd);
+      const pend = document.createElement('span');
+      pend.className = 'cal-legend-item';
+      pend.innerHTML = '<span class="cal-swatch" style="border:1px dashed var(--rule)"></span>Not yet reported';
+      legend.appendChild(pend);
+
+      document.getElementById('cal-note').textContent =
+        'Average = ' + (metric === 'cost'
+          ? formatDollars(String(avg))
+          : Math.round(avg).toLocaleString('en-US') + ' person-hours') +
+        ' per weekday, across all ' + calByDate.size + ' days tracked. ' +
+        '“About average” means within 20% of it either way. ' +
+        (metric === 'cost' ? 'Cells show the estimated cost.' : 'Cells show person-hours of delay.');
+    }
+
+    function showCalDetail(pt, avg, metric) {
+      const val = metricValue(pt, metric);
+      const valueLabel = metric === 'cost'
+        ? formatDollars(String(val))
+        : Math.round(val).toLocaleString('en-US') + ' person-hours';
+      document.getElementById('cal-detail').innerHTML =
+        fmtFull(pt.date) + '<br><strong>' + valueLabel + '</strong> &middot; ' + compareToAvg(val, avg);
+    }
+
+    function renderCalendar() {
+      if (!rawData.length || calYear === null) return;
+      const metric = metricView;
+      const vals   = Array.from(calByDate.values()).map(d => metricValue(d, metric));
+      const avg    = vals.reduce((s, v) => s + v, 0) / vals.length;
+
+      document.getElementById('cal-month').textContent = MONTH_NAMES[calMonth] + ' ' + calYear;
+      document.getElementById('cal-prev').disabled =
+        calYear === CAL_FIRST_MONTH.year && calMonth === CAL_FIRST_MONTH.month;
+      document.getElementById('cal-next').disabled =
+        calYear === calLatest.getFullYear() && calMonth === calLatest.getMonth();
+
+      const grid = document.getElementById('cal-grid');
+      grid.innerHTML = '';
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(name => {
+        const h = document.createElement('div');
+        h.className = 'cal-dow';
+        h.textContent = name;
+        grid.appendChild(h);
+      });
+
+      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      let padded = false;
+      let tracked = 0, above = 0, near = 0, below = 0, monthTotal = 0;
+      let selectedCell = null;
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(calYear, calMonth, day);
+        if (!isWeekday(date)) continue;
+
+        // Blank cells before the month's first weekday, so it lands in the right column
+        if (!padded) {
+          for (let i = 1; i < date.getDay(); i++) grid.appendChild(document.createElement('div'));
+          padded = true;
+        }
+
+        const pt = calByDate.get(dateKey(date));
+        if (!pt) {
+          const cell = document.createElement('div');
+          const pending = date > calLatest;
+          cell.className = 'cal-day ' + (pending ? 'pending' : 'nodata');
+          cell.title = fmtFull(date) + (pending ? ' — not yet reported' : ' — no data (holiday or not tracked)');
+          cell.innerHTML = '<span class="cal-num">' + day + '</span>';
+          grid.appendChild(cell);
+          continue;
+        }
+
+        const val   = metricValue(pt, metric);
+        const ratio = avg > 0 ? val / avg : 0;
+        const bin   = calBin(ratio);
+        tracked++;
+        monthTotal += val;
+        if (ratio >= 1.2) above++;
+        else if (ratio >= 0.8) near++;
+        else below++;
+
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'cal-day';
+        cell.style.background = bin.color;
+        cell.style.color = bin.text;
+        cell.setAttribute('aria-label',
+          fmtFull(date) + ': ' + formatMetricValue(val, metric) + ', ' + compareToAvg(val, avg) + ' (' + bin.label.toLowerCase() + ')');
+        cell.innerHTML =
+          '<span class="cal-num">' + day + '</span>' +
+          '<span class="cal-val">' + compactValue(val, metric) + '</span>';
+
+        const select = () => {
+          if (selectedCell) selectedCell.classList.remove('selected');
+          selectedCell = cell;
+          cell.classList.add('selected');
+          showCalDetail(pt, avg, metric);
+        };
+        cell.addEventListener('mouseenter', () => showCalDetail(pt, avg, metric));
+        cell.addEventListener('focus', select);
+        cell.addEventListener('click', select);
+        grid.appendChild(cell);
+      }
+
+      // Put the detail line back to the tapped day (or the prompt) when the pointer leaves the grid
+      grid.onmouseleave = () => {
+        if (selectedCell) selectedCell.click();
+        else document.getElementById('cal-detail').textContent = 'Hover over or tap a day for details.';
+      };
+      document.getElementById('cal-detail').textContent = 'Hover over or tap a day for details.';
+
+      document.getElementById('cal-summary').textContent = tracked === 0
+        ? 'No days tracked this month.'
+        : tracked + ' weekday' + (tracked === 1 ? '' : 's') + ' tracked: ' +
+          above + ' above average, ' + near + ' about average, ' + below + ' below. ' +
+          'Month total: ' + formatMetricValue(monthTotal, metric).replace(' hrs', ' person-hours') + '.';
+
+      buildCalLegend(avg, metric);
+    }
+
+    function shiftCalMonth(step) {
+      const d = new Date(calYear, calMonth + step, 1);
+      const first = new Date(CAL_FIRST_MONTH.year, CAL_FIRST_MONTH.month, 1);
+      const last  = new Date(calLatest.getFullYear(), calLatest.getMonth(), 1);
+      if (d < first || d > last) return;
+      calYear = d.getFullYear();
+      calMonth = d.getMonth();
+      renderCalendar();
+    }
+    document.getElementById('cal-prev').addEventListener('click', () => shiftCalMonth(-1));
+    document.getElementById('cal-next').addEventListener('click', () => shiftCalMonth(1));
+
+    // ============================================================
+    // CONTROLS: line chart / calendar toggle
+    // ============================================================
+    // Buttons that only apply to the line chart, hidden in calendar view
+    const LINE_ONLY_BUTTONS = ['btn-ma', 'btn-events', 'btn-png'];
+
+    function setView(mode) {
+      if (mode === viewMode || !rawData.length) return;
+      viewMode = mode;
+      const isCal = mode === 'calendar';
+      document.getElementById('btn-view-line').classList.toggle('active', !isCal);
+      document.getElementById('btn-view-cal').classList.toggle('active', isCal);
+      document.getElementById('wrap-hours').hidden = isCal;
+      document.getElementById('wrap-cal').hidden = !isCal;
+      LINE_ONLY_BUTTONS.forEach(id => document.getElementById(id).classList.toggle('hidden', isCal));
+      // Redraw the line chart when it comes back into view: Chart.js can't
+      // measure a hidden canvas, so any redraw while hidden comes out the wrong size.
+      if (isCal) renderCalendar();
+      else buildChart(rawData, metricView);
+    }
+    document.getElementById('btn-view-line').addEventListener('click', () => setView('line'));
+    document.getElementById('btn-view-cal').addEventListener('click', () => setView('calendar'));
+
+    // ============================================================
     // CONTROLS: hours / cost toggle
     // ============================================================
     function setMetric(metric) {
@@ -1205,7 +1630,8 @@
       document.getElementById('btn-metric-hours').classList.toggle('active', metric === 'hours');
       document.getElementById('btn-metric-cost').classList.toggle('active', metric === 'cost');
       populateStats(rawData, metricView);
-      buildChart(rawData, metricView);
+      if (viewMode === 'calendar') renderCalendar();
+      else buildChart(rawData, metricView);
     }
     document.getElementById('btn-metric-hours').addEventListener('click', () => setMetric('hours'));
     document.getElementById('btn-metric-cost').addEventListener('click', () => setMetric('cost'));
@@ -1294,10 +1720,13 @@
         canvas.style.display = 'block';
 
         populateStats(rawData, metricView);
-        buildChart(rawData, metricView);
+        prepareCalendar(rawData);
+        // The calendar is the default view; the line chart is drawn the
+        // first time someone switches to it (see setView).
+        setView('calendar');
 
         // Enable controls now that data is loaded
-        ['btn-metric-hours', 'btn-metric-cost', 'btn-ma', 'btn-events', 'btn-csv', 'btn-png'].forEach(id => {
+        ['btn-view-line', 'btn-view-cal', 'btn-metric-hours', 'btn-metric-cost', 'btn-ma', 'btn-events', 'btn-csv', 'btn-png'].forEach(id => {
           document.getElementById(id).disabled = false;
         });
       } catch (err) {
