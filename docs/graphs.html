@@ -694,9 +694,9 @@
       <p class="chart-title">Observed delays, by day</p>
       <p class="chart-desc">
         Person-hours or estimated dollar cost of delay per weekday &mdash; toggle below &mdash;
-        sourced from NJ Transit service alerts. Weekends are omitted. Hover over any point
-        for details. The dotted line marks the average per day. Switch to the calendar view
-        to see each weekday color-coded against that average, month by month.
+        sourced from NJ Transit service alerts. Weekends are omitted. The calendar colors each
+        weekday against the average day; hover over or tap a day for details. Switch to the
+        line chart to see the full trend at once.
       </p>
 
       <div class="mini-stats">
@@ -1720,8 +1720,10 @@
         canvas.style.display = 'block';
 
         populateStats(rawData, metricView);
-        buildChart(rawData, metricView);
         prepareCalendar(rawData);
+        // The calendar is the default view; the line chart is drawn the
+        // first time someone switches to it (see setView).
+        setView('calendar');
 
         // Enable controls now that data is loaded
         ['btn-view-line', 'btn-view-cal', 'btn-metric-hours', 'btn-metric-cost', 'btn-ma', 'btn-events', 'btn-csv', 'btn-png'].forEach(id => {
