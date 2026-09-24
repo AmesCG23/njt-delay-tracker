@@ -545,6 +545,8 @@ Uses Chart.js (loaded from CDN). Three charts:
 
 1. **Line chart:** Daily person-hours of delay over time. Reads Tweet_log column G (person-hours) and column F (report date). Includes a 3-day moving average toggle, CSV export, and PNG export. Uses `TWEET_LOG_GID = '943972512'` — this GID must be published separately from for_web.
 
+   **Calendar view (September 2026):** a "Line chart / Calendar" switch above the chart swaps in a month-by-month calendar of the same data (Mon–Fri only, since weekends aren't tracked). Arrows page back as far as April 2026 (`CAL_FIRST_MONTH`) and forward to the month of the latest data. Each day is colored by its ratio to the all-time daily average (the same average as the line chart's dotted line), following the Hours/Cost toggle: dark green = no delays, greens = below average, yellow = within 20% of average, orange → red → deep red = increasingly above average (deep red = 2.5× average or more). Hatched gray = weekday with no data (e.g. a skipped federal holiday); dashed outline = not yet reported. **To change the cutoffs or colors, edit the `CAL_BINS` list in the script** — the legend is built from it automatically. The 3-day avg, Display events, and PNG buttons are hidden in calendar view; CSV export still works.
+
 2. **Bar chart (horizontal):** Cumulative person-hours by rail line, from Tweet_log columns K–S.
 
 3. **Doughnut:** Morning vs. evening share of total cost, from `for_web` A6 and A7.
