@@ -523,6 +523,36 @@
       color: var(--ink-faint);
     }
 
+    /* Days inside a CHART_PERIODS stretch (e.g. Portal Bridge cutover):
+       the day's color is washed out under light white hatching, and a
+       short note sits in the middle of the cell. The color itself is
+       set inline by renderCalendar(). */
+    .cal-day.period {
+      position: relative;
+      color: var(--ink) !important;
+    }
+    .cal-day.period.nodata,
+    .cal-day.period.pending {
+      background: repeating-linear-gradient(45deg, #faf9f7, #faf9f7 4px, #eceae6 4px, #eceae6 8px);
+    }
+    .cal-period-note {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0.25rem;
+      font-size: 0.66rem;
+      font-style: italic;
+      line-height: 1.05;
+      text-align: center;
+      color: var(--ink-light);
+      pointer-events: none;
+    }
+    @media (max-width: 600px) {
+      .cal-period-note { font-size: 0.55rem; }
+    }
+
     .cal-day.pending {
       border: 1px dashed var(--rule);
       color: var(--ink-faint);
@@ -742,6 +772,10 @@
         <canvas id="chart-hours" style="display:none;" role="img" aria-label="Line chart of person-hours of NJ Transit delay per weekday. Use the Export CSV button for the underlying data."></canvas>
       </div>
 
+      <!-- Key for the dotted stretch(es) of the line chart; filled in by
+           buildChart() from CHART_PERIODS, hidden when none are in the data -->
+      <p class="cal-note" id="line-period-note" hidden></p>
+
       <!-- Calendar view: same data as the line chart, one cell per weekday.
            Hidden until the "Calendar" button is pressed; filled in by
            renderCalendar() in the script below. -->
@@ -829,6 +863,27 @@
       { date: '2026-05-01', label: 'Methodology v2.0', effectiveNextDay: true },
       { date: '2026-05-29', label: 'Penn Station fire injures 5' },
     ];
+
+    // ============================================================
+    // CHART PERIODS — events that last a stretch of days, not one day
+    // ------------------------------------------------------------
+    // Days from `start` through `end` (inclusive, YYYY-MM-DD) are marked
+    // as unusual service: the line chart draws that stretch as a dotted
+    // line (always) plus a shaded, labeled band (when "Display events"
+    // is on), and the calendar shades those days with light hatching
+    // and a short note inside each cell.
+    //   label     — full name, used in the chart band and hover details
+    //   shortNote — the few words that fit inside a calendar cell
+    // ============================================================
+    const CHART_PERIODS = [
+      { start: '2026-10-13', end: '2026-11-15',
+        label: 'Portal Bridge cutover, phase 2', shortNote: 'Portal Bridge cutover' },
+    ];
+
+    // The period (if any) a 'YYYY-MM-DD' date falls in
+    function periodFor(key) {
+      return CHART_PERIODS.find(p => key >= p.start && key <= p.end) || null;
+    }
     // ============================================================
 
     const csvUrl =
@@ -1093,6 +1148,7 @@
           ? 'at average'
           : Math.abs(pct) + '% ' + (pct > 0 ? 'above' : 'below') + ' average';
         const onTime = pt.hours === 0;
+        const period = periodFor(dateKey(pt.date));
         const valueLabel = metric === 'cost'
           ? formatDollars(String(val))
           : val.toLocaleString('en-US') + ' person-hours';
@@ -1100,7 +1156,8 @@
         el.innerHTML =
           '<div class="tt-date">'    + fmtFull(pt.date)                 + '</div>' +
           '<div class="tt-value">'   + valueLabel                       + '</div>' +
-          '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs) + '</div>';
+          '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs) + '</div>' +
+          (period ? '<div class="tt-compare">' + period.label + '</div>' : '');
 
         // Position relative to chart-wrap-main
         const wrap      = document.getElementById('wrap-hours');
@@ -1147,6 +1204,15 @@
       const labels = data.map(d => d.label);
       const values = metricValues(data, metric);
       const avg    = values.reduce((s, v) => s + v, 0) / values.length;
+      const keys     = data.map(d => dateKey(d.date));
+      const inPeriod = keys.map(k => !!periodFor(k));
+
+      const shownPeriods = CHART_PERIODS.filter(p => keys.some(k => k >= p.start && k <= p.end));
+      const periodNoteEl = document.getElementById('line-period-note');
+      periodNoteEl.hidden = !shownPeriods.length;
+      periodNoteEl.textContent = shownPeriods.map(p =>
+        'Dotted line' + (showEvents ? ' and shaded area' : '') + ': ' + p.label + ' (' + fmtShortRange(p.start, p.end) + ').'
+      ).join(' ');
 
       hoursChart = new Chart(ctx, {
         type: 'line',
@@ -1165,6 +1231,11 @@
               pointBackgroundColor: ACCENT,
               pointBorderColor: '#f0eeeb',
               pointBorderWidth: 2,
+              // Dotted line for any stretch inside a CHART_PERIODS entry
+              // (e.g. the Portal Bridge cutover)
+              segment: {
+                borderDash: seg => inPeriod[seg.p1DataIndex] ? [3, 4] : undefined,
+              },
               order: 1,
             },
             {
@@ -1232,6 +1303,20 @@
                         font: { family: FONT, size: 11 },
                         padding: { x: 6, y: 3 },
                       },
+                    };
+                  });
+                  // Shaded band over each multi-day period that has data
+                  CHART_PERIODS.forEach((p, i) => {
+                    const idxs = keys.map((k, j) => (k >= p.start && k <= p.end) ? j : -1).filter(j => j !== -1);
+                    if (!idxs.length) return;
+                    const first = idxs[0], last = idxs[idxs.length - 1];
+                    acc['period' + i] = {
+                      type: 'box',
+                      xMin: Math.max(first - 0.5, 0),
+                      xMax: Math.min(last + 0.5, data.length - 1),
+                      backgroundColor: 'rgba(180, 40, 40, 0.07)',
+                      borderWidth: 0,
+                      drawTime: 'beforeDatasetsDraw',
                     };
                   });
                 }
@@ -1425,6 +1510,15 @@
         String(d.getDate()).padStart(2, '0');
     }
 
+    // Light hatching laid over a day's color, for days inside a CHART_PERIODS stretch
+    function periodHatch(color) {
+      return 'repeating-linear-gradient(45deg, rgba(255,255,255,0.62) 0 4px, rgba(255,255,255,0.4) 4px 8px), ' + color;
+    }
+
+    function periodNote(period) {
+      return '<span class="cal-period-note">' + period.shortNote + '</span>';
+    }
+
     function calBin(ratio) {
       return CAL_BINS.find(b => ratio < b.maxRatio) || CAL_BINS[CAL_BINS.length - 1];
     }
@@ -1455,6 +1549,13 @@
       calMonth  = calLatest.getMonth();
     }
 
+    // '2026-10-13','2026-11-15' -> 'Oct 13 – Nov 15'
+    function fmtShortRange(start, end) {
+      const f = k => { const [y, m, d] = k.split('-').map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+      return f(start) + ' – ' + f(end);
+    }
+
     function buildCalLegend(avg, metric) {
       const legend = document.getElementById('cal-legend');
       legend.innerHTML = '';
@@ -1472,6 +1573,13 @@
       pend.className = 'cal-legend-item';
       pend.innerHTML = '<span class="cal-swatch" style="border:1px dashed var(--rule)"></span>Not yet reported';
       legend.appendChild(pend);
+      CHART_PERIODS.forEach(p => {
+        const item = document.createElement('span');
+        item.className = 'cal-legend-item';
+        item.innerHTML = '<span class="cal-swatch" style="background:' + periodHatch('#f6d44b') + '"></span>' +
+          p.label + ' (' + fmtShortRange(p.start, p.end) + ')';
+        legend.appendChild(item);
+      });
 
       document.getElementById('cal-note').textContent =
         'Average = ' + (metric === 'cost'
@@ -1487,8 +1595,10 @@
       const valueLabel = metric === 'cost'
         ? formatDollars(String(val))
         : Math.round(val).toLocaleString('en-US') + ' person-hours';
+      const period = periodFor(dateKey(pt.date));
       document.getElementById('cal-detail').innerHTML =
-        fmtFull(pt.date) + '<br><strong>' + valueLabel + '</strong> &middot; ' + compareToAvg(val, avg);
+        fmtFull(pt.date) + '<br><strong>' + valueLabel + '</strong> &middot; ' + compareToAvg(val, avg) +
+        (period ? '<br><em>' + period.label + '</em>' : '');
     }
 
     function renderCalendar() {
@@ -1531,9 +1641,11 @@
         if (!pt) {
           const cell = document.createElement('div');
           const pending = date > calLatest;
-          cell.className = 'cal-day ' + (pending ? 'pending' : 'nodata');
-          cell.title = fmtFull(date) + (pending ? ' — not yet reported' : ' — no data (holiday or not tracked)');
-          cell.innerHTML = '<span class="cal-num">' + day + '</span>';
+          const period = periodFor(dateKey(date));
+          cell.className = 'cal-day ' + (pending ? 'pending' : 'nodata') + (period ? ' period' : '');
+          cell.title = fmtFull(date) + (pending ? ' — not yet reported' : ' — no data (holiday or not tracked)') +
+            (period ? ' · ' + period.label : '');
+          cell.innerHTML = '<span class="cal-num">' + day + '</span>' + (period ? periodNote(period) : '');
           grid.appendChild(cell);
           continue;
         }
@@ -1547,15 +1659,18 @@
         else if (ratio >= 0.8) near++;
         else below++;
 
+        const period = periodFor(dateKey(date));
         const cell = document.createElement('button');
         cell.type = 'button';
-        cell.className = 'cal-day';
-        cell.style.background = bin.color;
+        cell.className = 'cal-day' + (period ? ' period' : '');
+        cell.style.background = period ? periodHatch(bin.color) : bin.color;
         cell.style.color = bin.text;
         cell.setAttribute('aria-label',
-          fmtFull(date) + ': ' + formatMetricValue(val, metric) + ', ' + compareToAvg(val, avg) + ' (' + bin.label.toLowerCase() + ')');
+          fmtFull(date) + ': ' + formatMetricValue(val, metric) + ', ' + compareToAvg(val, avg) + ' (' + bin.label.toLowerCase() + ')' +
+          (period ? ', during the ' + period.label : ''));
         cell.innerHTML =
           '<span class="cal-num">' + day + '</span>' +
+          (period ? periodNote(period) : '') +
           '<span class="cal-val">' + compactValue(val, metric) + '</span>';
 
         const select = () => {
@@ -1611,6 +1726,7 @@
       document.getElementById('btn-view-line').classList.toggle('active', !isCal);
       document.getElementById('btn-view-cal').classList.toggle('active', isCal);
       document.getElementById('wrap-hours').hidden = isCal;
+      if (isCal) document.getElementById('line-period-note').hidden = true;   // buildChart() re-shows it
       document.getElementById('wrap-cal').hidden = !isCal;
       LINE_ONLY_BUTTONS.forEach(id => document.getElementById(id).classList.toggle('hidden', isCal));
       // Redraw the line chart when it comes back into view: Chart.js can't
