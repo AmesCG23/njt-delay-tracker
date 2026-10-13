@@ -553,6 +553,8 @@ Uses Chart.js (loaded from CDN). Three charts:
 
 **`METHODOLOGY_CHANGES` array** near the top of `graphs.html`: Draws red vertical lines on the time-series chart at methodology change dates. Currently one entry is configured. Activate by adding entries with `{ after: 'YYYY-MM-DD', label: '...' }`.
 
+**`CHART_PERIODS` array** (October 2026) right below `CHART_EVENTS` in `graphs.html`: multi-day events, as `{ start, end, label, shortNote }`. Currently one entry — **Portal Bridge cutover, phase 2, Oct 13 – Nov 15, 2026**. For days in a period, the line chart is drawn dotted (always), with a faint red shaded band when "Display events" is on and a one-line key under the chart; the calendar washes the day's color out under light white hatching with the `shortNote` text centered in the cell (pending/no-data days in the period get the hatching and note too), plus a legend entry and a line in the hover details. To add another stretch (e.g. a later cutover phase), add an entry — nothing else needs changing.
+
 ### `docs/methodology.html` — Methodology Explainer
 
 **`docs/methodology.md` is the editable source of truth.** The page ships with a baked static HTML copy of the markdown inside `#methodology-content` (so non-JS crawlers can read it), then fetches `methodology.md` and re-renders it client-side with marked.js — so md edits show up for human visitors immediately even if the baked copy is stale. **When you edit `methodology.md`, regenerate the static block in `methodology.html` to match** (a one-step task for Claude). On fetch failure the baked copy stays; the page is never blanked.
