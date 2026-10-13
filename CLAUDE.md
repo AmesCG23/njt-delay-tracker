@@ -766,6 +766,10 @@ Full white paper: `NJT_Delay_Tracker_Methodology.docx`
 
 ---
 
+## Portal Bridge Mode (`docs/index.html`)
+
+A World Cup Mode–style Easter egg for the **Portal Bridge cutover, phase 2 (Oct 13 – Nov 15, 2026)**. Four delimited blocks in `docs/index.html` (search `PORTAL BRIDGE MODE`): CSS, the `#pb-overlay` div, the `.header-right` wrapper + `#pb-toggle` button, and the script. Floaters: SVG stop signs (30%, each "held at a signal" partway up at a random height), 🌉 bridges that swing as they rise (25%), 🚧 barriers (12%), and hazard-yellow/orange/black/white confetti. The toggle is a hazard-striped construction sign whose stripes march when on. Outside the window the button stays hidden and nothing runs; `?pb=1` on the URL previews it any time. Default ON during the window unless the visitor opted out (`localStorage` key `njt-pb-off`) or prefers reduced motion. To remove, delete the four blocks (same procedure as World Cup Mode below).
+
 ## World Cup Mode (`docs/index.html`)
 
 A seasonal Easter egg active June 13 – July 31, 2026 (2026 FIFA World Cup, hosted in USA/Canada/Mexico). Lives in `docs/index.html` — all World Cup code is clearly delimited with removal instructions in comments.

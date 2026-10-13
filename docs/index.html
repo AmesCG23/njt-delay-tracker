@@ -433,6 +433,127 @@
        END WORLD CUP MODE CSS
        ================================================================ */
 
+    /* ================================================================
+       PORTAL BRIDGE MODE CSS — active Oct 13 – Nov 15, 2026
+       (Portal Bridge cutover, phase 2). Patterned on World Cup Mode.
+       To remove: delete everything from here to END PORTAL BRIDGE MODE CSS.
+       ================================================================ */
+    #pb-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 8000;
+      overflow: hidden;
+    }
+
+    .pb-floater {
+      position: absolute;
+      pointer-events: none;
+      line-height: 1;
+      user-select: none;
+      will-change: transform, opacity;
+    }
+
+    /* Stop signs: rise, get held at a signal partway up, then carry on.
+       --pb-stall (set per sign by the script) is how high up it stops. */
+    @keyframes pbStop {
+      0%   { transform: translateY(0)                                  rotate(0deg);  opacity: 0;    }
+      6%   {                                                                           opacity: 0.92; }
+      35%  { transform: translateY(calc(var(--pb-stall, -40vh) + 2vh)) rotate(-6deg); }
+      38%  { transform: translateY(var(--pb-stall, -40vh))             rotate(4deg);  }
+      41%  { transform: translateY(var(--pb-stall, -40vh))             rotate(-3deg); }
+      58%  { transform: translateY(var(--pb-stall, -40vh))             rotate(0deg);  }
+      94%  {                                               opacity: 0.92; }
+      100% { transform: translateY(-110vh) rotate(0deg);  opacity: 0;    }
+    }
+
+    /* Bridges: swing back and forth on the way up (Portal is a swing bridge) */
+    @keyframes pbBridge {
+      0%   { transform: translateY(0)      rotate(0deg);   opacity: 0;   }
+      7%   {                                                opacity: 0.9; }
+      20%  { transform: translateY(-20vh)  rotate(14deg);  }
+      40%  { transform: translateY(-40vh)  rotate(-14deg); }
+      60%  { transform: translateY(-60vh)  rotate(12deg);  }
+      80%  { transform: translateY(-80vh)  rotate(-10deg); }
+      93%  {                                                opacity: 0.9; }
+      100% { transform: translateY(-110vh) rotate(0deg);   opacity: 0;   }
+    }
+
+    /* Construction barriers: slow, steady crawl */
+    @keyframes pbWork {
+      0%   { transform: translateY(0)      translateX(0px);   opacity: 0;    }
+      7%   {                                                   opacity: 0.9;  }
+      50%  { transform: translateY(-50vh)  translateX(16px);  }
+      93%  {                                                   opacity: 0.9;  }
+      100% { transform: translateY(-110vh) translateX(-8px);  opacity: 0;    }
+    }
+
+    @keyframes pbConf {
+      0%   { transform: translateY(0)      translateX(0px)   rotate(0deg);   opacity: 0; }
+      7%   {                                                                  opacity: 1; }
+      30%  { transform: translateY(-30vh)  translateX(40px)  rotate(180deg); }
+      60%  { transform: translateY(-60vh)  translateX(-30px) rotate(400deg); }
+      93%  {                                                                  opacity: 1; }
+      100% { transform: translateY(-110vh) translateX(20px)  rotate(600deg); opacity: 0; }
+    }
+
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    /* Toggle: a construction sign — yellow plate inside a hazard-striped frame */
+    #pb-toggle {
+      background: repeating-linear-gradient(-45deg, #111 0 6px, #FFD100 6px 12px);
+      background-size: 34px 34px;
+      border: 0;
+      border-radius: 2px;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.35);
+      cursor: pointer;
+      padding: 4px;
+      user-select: none;
+    }
+
+    #pb-toggle span {
+      display: block;
+      background: #FFD100;
+      color: #111;
+      font-family: 'Arial Black', 'Arial Bold', Impact, sans-serif;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      white-space: nowrap;
+    }
+
+    #pb-toggle:hover  { filter: brightness(1.08); }
+    #pb-toggle:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0,0,0,0.35); }
+
+    /* When on, the hazard stripes march around the frame */
+    #pb-toggle.pb-on { animation: pbStripes 1s linear infinite; }
+    #pb-toggle.pb-on span { background: #F7931E; }
+
+    @keyframes pbStripes {
+      from { background-position: 0 0; }
+      to   { background-position: 34px 0; }
+    }
+
+    /* Phones: let the logo shrink so the toggle fits beside it */
+    @media (max-width: 600px) {
+      .logo { flex: 1 1 auto; min-width: 0; }
+      .logo img { height: auto; max-height: 64px; max-width: 100%; }
+      .header-right { flex-shrink: 0; margin-left: 0.75rem; }
+      #pb-toggle { padding: 3px; }
+      #pb-toggle span { font-size: 8px; padding: 3px 5px; }
+    }
+
+    /* ================================================================
+       END PORTAL BRIDGE MODE CSS
+       ================================================================ */
+
     /* === REDUCED MOTION === */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -481,6 +602,10 @@
   <!-- <div id="wc-overlay" aria-hidden="true"></div> -->
   <!-- END WORLD CUP MODE overlay -->
 
+  <!-- PORTAL BRIDGE MODE: floater overlay — remove this div to excise the feature -->
+  <div id="pb-overlay" aria-hidden="true"></div>
+  <!-- END PORTAL BRIDGE MODE overlay -->
+
   <header>
     <div class="logo">
       <a href="index.html">
@@ -496,6 +621,11 @@
          and #wc-toggle button commented out, leaving <nav> a direct child of
          <header> (its original structure). Re-enable by uncommenting them. -->
     <!-- <div class="header-right"> -->
+    <!-- PORTAL BRIDGE MODE: .header-right stacks the Bluesky icon above the
+         toggle button. To remove: delete this wrapper div, its closing tag and
+         the <button id="pb-toggle"> below, leaving <nav class="social-icons">
+         a direct child of <header>. -->
+    <div class="header-right">
       <nav class="social-icons">
         <!-- Bluesky -->
         <a href="https://bsky.app/profile/njtdelaytracker.bsky.social" aria-label="Bluesky" title="Follow on Bluesky">
@@ -507,6 +637,9 @@
       <!-- <button id="wc-toggle">⚽ World Cup Mode</button> -->
     <!-- </div> -->
     <!-- END WORLD CUP MODE header -->
+      <button id="pb-toggle" type="button" hidden><span>🚧 Portal Bridge Mode</span></button>
+    </div>
+    <!-- END PORTAL BRIDGE MODE header -->
 
   </header>
 
@@ -831,6 +964,125 @@
   */
   </script>
   <!-- END WORLD CUP MODE SCRIPT -->
+
+  <!-- ================================================================
+       PORTAL BRIDGE MODE SCRIPT — active Oct 13 – Nov 15, 2026
+       (Portal Bridge cutover, phase 2). Patterned on World Cup Mode.
+       Floaters are plain emoji (no images to download).
+       To remove: delete this entire <script> block.
+       ================================================================ -->
+  <script>
+  (function () {
+    // Cutover window, in the visitor's local time: Oct 13 through Nov 15, 2026
+    const PB_START = new Date(2026, 9, 13);
+    const PB_END   = new Date(2026, 10, 16);   // first day after the window
+
+    // Stop sign drawn as an SVG (red octagon, white rim, "STOP"), so it
+    // reads as a stop sign on every device — the 🛑 emoji is a bare octagon.
+    const STOP_SRC = 'data:image/svg+xml,' + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+      '<polygon points="29.3,0 70.7,0 100,29.3 100,70.7 70.7,100 29.3,100 0,70.7 0,29.3" fill="#fff"/>' +
+      '<polygon points="31.4,5 68.6,5 95,31.4 95,68.6 68.6,95 31.4,95 5,68.6 5,31.4" fill="#C8102E"/>' +
+      '<text x="50" y="61" text-anchor="middle" font-family="Arial Black,Arial,Helvetica,sans-serif" ' +
+      'font-weight="900" font-size="29" fill="#fff">STOP</text></svg>');
+    const STOP_SIZES   = [34, 42, 52];
+    const BRIDGE_SIZES = [38, 48, 60];
+    const WORK_SIZES   = [30, 38];
+    // Construction-site palette for confetti: hazard yellow, orange, black, white
+    const CONF_COLORS  = ['#FFD100', '#F7931E', '#111111', '#FFFFFF', '#FFD100', '#F7931E'];
+
+    const overlay = document.getElementById('pb-overlay');
+    const btn     = document.getElementById('pb-toggle');
+    const label   = btn.querySelector('span');
+    let   pbOn    = false;
+    let   timer   = null;
+
+    // Presence of this key = user opted OUT; absence = default ON during the cutover
+    const PREF_KEY = 'njt-pb-off';
+    function userHasOptedOut() {
+      try { return localStorage.getItem(PREF_KEY) === '1'; } catch { return false; }
+    }
+    function saveOptOut()  { try { localStorage.setItem(PREF_KEY, '1'); } catch {} }
+    function clearOptOut() { try { localStorage.removeItem(PREF_KEY); }   catch {} }
+
+    // ?pb=1 previews the mode outside the cutover window
+    const forced = /[?&]pb=1\b/.test(location.search);
+    function isCutover() {
+      const now = new Date();
+      return now >= PB_START && now < PB_END;
+    }
+    if (!isCutover() && !forced) return;   // off-season: button stays hidden, nothing runs
+    btn.hidden = false;
+
+    function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function emoji(char, sizes) {
+      const el = document.createElement('span');
+      el.textContent = char;
+      el.style.fontSize = pickRandom(sizes) + 'px';
+      return el;
+    }
+
+    function spawnFloater() {
+      const roll = Math.random();
+      let el, animName, dur;
+      if (roll < 0.30) {
+        el = document.createElement('img');
+        el.src = STOP_SRC; el.alt = '';
+        el.width = el.height = pickRandom(STOP_SIZES);
+        el.style.setProperty('--pb-stall', -(20 + Math.random() * 55).toFixed(0) + 'vh');
+        animName = 'pbStop'; dur = 11 + Math.random() * 7;
+      } else if (roll < 0.55) {
+        el = emoji('🌉', BRIDGE_SIZES); animName = 'pbBridge'; dur = 10 + Math.random() * 8;
+      } else if (roll < 0.67) {
+        el = emoji('🚧', WORK_SIZES);   animName = 'pbWork';   dur = 13 + Math.random() * 6;
+      } else {
+        el = document.createElement('div');
+        const sz = 5 + Math.floor(Math.random() * 9);
+        el.style.width = sz + 'px'; el.style.height = sz + 'px';
+        el.style.background = pickRandom(CONF_COLORS);
+        el.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.08)';
+        animName = 'pbConf'; dur = 6 + Math.random() * 8;
+      }
+      el.className = 'pb-floater';
+      el.style.left   = (2 + Math.random() * 94) + '%';
+      el.style.bottom = '-80px';
+      el.style.animation = `${animName} ${dur.toFixed(1)}s ease-in-out forwards`;
+      overlay.appendChild(el);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
+
+    function startPB() {
+      pbOn = true;
+      label.textContent = '🛑 Turn Off';
+      btn.classList.add('pb-on');
+      btn.title = 'Turn off Portal Bridge Mode';
+      for (let i = 0; i < 10; i++) setTimeout(spawnFloater, i * 220);
+      timer = setInterval(spawnFloater, 750);
+    }
+
+    function stopPB() {
+      pbOn = false;
+      label.textContent = '🚧 Portal Bridge Mode';
+      btn.classList.remove('pb-on');
+      btn.title = 'Turn on Portal Bridge Mode';
+      clearInterval(timer);
+      timer = null;
+    }
+
+    btn.addEventListener('click', () => {
+      if (pbOn) { stopPB(); saveOptOut(); }
+      else      { startPB(); clearOptOut(); }
+    });
+
+    // Auto-start during the cutover unless the visitor opted out or their
+    // OS asks for reduced motion (the toggle still works either way).
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!userHasOptedOut() && !reducedMotion) startPB();
+    else stopPB();
+  })();
+  </script>
+  <!-- END PORTAL BRIDGE MODE SCRIPT -->
 
 </body>
 </html>
