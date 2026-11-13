@@ -1,12 +1,12 @@
 {
   "project": "NJT Delay Tracker",
   "site": "https://bettertrains.org/",
-  "report_date": "2026-11-10",
-  "daily_cost_usd": 186267,
-  "daily_person_hours": 4233,
-  "cumulative_cost_usd": 64615422,
+  "report_date": "2026-11-12",
+  "daily_cost_usd": 590883,
+  "daily_person_hours": 13429,
+  "cumulative_cost_usd": 65206305,
   "cumulative_since": "2026-03-31",
-  "updated_utc": "2026-11-11T19:48:34Z",
+  "updated_utc": "2026-11-13T19:58:01Z",
   "methodology": "https://bettertrains.org/methodology.html",
   "notes": "Estimates of productive time lost to NJ Transit commuter rail delays; opportunity costs, not cash losses, and not an official accounting. Not affiliated with NJ Transit."
 }
