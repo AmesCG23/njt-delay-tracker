@@ -339,7 +339,7 @@
            visitors even if this block is stale. WHEN YOU EDIT methodology.md,
            REGENERATE THIS BLOCK TO MATCH (ask Claude — it's a one-step task). -->
       <div id="methodology-content">
-        <p>This tracker's methodology remains a work in progress. We hope to refine it by obtaining better data through OPRA requests. Until then, here is how the system works:</p>
+        <p>This tracker's methodology remains a work in progress. We hope to refine it by obtaining better data through OPRA requests. Until then, here is how the system works.</p>
         <h2>Scraper</h2>
         <p>The core of the Delay Tracker is a scraper that pulls matching NJT delay alerts from a series of automated Bluesky accounts, chiefly <a href="https://bsky.app/profile/njmetroalerts.bsky.social">NJMetroAlert</a>. Claude (Haiku) parses the alerts for line, train number, and delay information, then deduplicates by preserving the longest delay per train number.</p>
         <p>The scraper looks for delays between 5:00 AM and 10:30 AM for the morning rush, and 3:00 PM and 8:30 PM for the evening rush. These are larger windows than traditional "peak" times but the effects of this wider "net" should cancel out without biasing our estimates. On the one hand, we observe more delays. On the other hand, we estimate lower ridership <em>per</em> train (see next section).</p>
