@@ -604,9 +604,8 @@
 
     /* === REDUCED MOTION === */
     /* === DATA-OUTAGE BANNER ("under construction") ===
-       Geocities-style notice that a main data source went dark. A
-       yellow road sign with a shoveling worker, inside a marching
-       hazard-striped frame. To remove: delete this CSS block and the
+       Geocities-style notice that a main data source went dark: a
+       blinking headline inside a marching hazard-striped frame. To remove: delete this CSS block and the
        #outage-banner div in the page body. The days it covers are set
        by UNDERCOUNT in the script. */
     .outage-banner {
@@ -624,20 +623,11 @@
     @keyframes hzMarch { to { background-position: 34px 0; } }
 
     .outage-inner {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
+      text-align: center;
       background: #fffbe0;
       border: 2px solid var(--hz-black);
       padding: 0.8rem 1rem;
     }
-
-    .outage-sign { flex: 0 0 92px; width: 92px; height: 92px; }
-    .outage-sign .dig {
-      transform-origin: 50px 52px;
-      animation: dig 0.9s ease-in-out infinite alternate;
-    }
-    @keyframes dig { from { transform: rotate(-14deg); } to { transform: rotate(10deg); } }
 
     .outage-head {
       font-family: Impact, 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
@@ -668,8 +658,7 @@
     .outage-key .tri { color: #6a3d9a; font-style: normal; }
 
     @media (max-width: 600px) {
-      .outage-inner { gap: 0.7rem; padding: 0.7rem; }
-      .outage-sign  { flex-basis: 64px; width: 64px; height: 64px; }
+      .outage-inner { padding: 0.7rem; }
       .outage-head  { font-size: 1.05rem; }
       .outage-msg   { font-size: 0.95rem; }
     }
@@ -804,31 +793,11 @@
          once replacement data sources are in place. -->
     <div class="outage-banner" id="outage-banner" role="note" aria-label="Data source notice">
       <div class="outage-inner">
-        <svg class="outage-sign" viewBox="0 0 100 100" aria-hidden="true">
-          <!-- diamond road sign -->
-          <polygon points="50,3 97,50 50,97 3,50" fill="#ffcc00" stroke="#111" stroke-width="4" stroke-linejoin="round"/>
-          <polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="#111" stroke-width="1.5"/>
-          <!-- dirt pile -->
-          <path d="M60 76 Q70 62 82 74 Z" fill="#111"/>
-          <!-- worker: hard hat, head, body, legs -->
-          <path d="M37 33 a8 7 0 0 1 16 0 Z" fill="#111"/>
-          <rect x="34" y="32" width="22" height="2.5" rx="1" fill="#111"/>
-          <circle cx="45" cy="39" r="5" fill="#111"/>
-          <path d="M45 44 L48 64" stroke="#111" stroke-width="5" stroke-linecap="round"/>
-          <path d="M48 64 L41 78 M48 64 L55 78" stroke="#111" stroke-width="4.5" stroke-linecap="round"/>
-          <!-- arm + shovel, rocking back and forth -->
-          <g class="dig">
-            <path d="M47 50 L60 58" stroke="#111" stroke-width="4" stroke-linecap="round"/>
-            <path d="M54 46 L70 72" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M66 70 L75 68 L76 77 L70 79 Z" fill="#111"/>
-          </g>
-        </svg>
-        <div>
-          <div class="outage-head">&#x1F6A7; Under Construction &#x1F6A7;</div>
-          <p class="outage-msg"><strong>Note:</strong> One of our main data sources went dark in October.
-            We&rsquo;re working on replacements. Until then, delay costs are likely significant underestimates.</p>
-          <p class="outage-key">Days affected are flagged in <span class="tri">purple &#9650;</span> on the chart and calendar below.</p>
-        </div>
+        <div class="outage-head">&#x1F6A7; Under Construction &#x1F6A7;</div>
+        <p class="outage-msg"><strong>Note:</strong> One of our main data sources went dark in October.
+          We&rsquo;re working on replacements. Until then, delay costs are likely significant underestimates.</p>
+        <p class="outage-key">Our counts were affected starting in late August. Days affected are flagged in
+          <span class="tri">purple &#9650;</span> on the chart and calendar below.</p>
       </div>
     </div>
 
@@ -1027,9 +996,15 @@
     // The banner at the top of the page is separate HTML (#outage-banner).
     // ============================================================
     const UNDERCOUNT = {
-      start: '2026-10-01',   // ← CONFIRM: first report date affected by the outage
+      // The main all-lines account (njmetroalerts) stopped reaching the
+      // scraper Aug. 20–28, 2026: its posting volume exploded, so the
+      // 500-post fetch cap no longer reached back to the prior day's rush
+      // hours. It then went silent entirely on Oct. 4. Aug. 21 is the first
+      // report date after the last Raritan Valley / Atlantic City delay was
+      // logged (those lines were only ever read through that account).
+      start: '2026-08-21',
       end:   null,
-      label: 'Likely an underestimate (a main data source went dark)',
+      label: 'Likely an underestimate (main data source outage)',
     };
     const UNDER_COLOR = '#6a3d9a';
 
