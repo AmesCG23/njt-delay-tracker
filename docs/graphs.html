@@ -603,6 +603,94 @@
     }
 
     /* === REDUCED MOTION === */
+    /* === DATA-OUTAGE BANNER ("under construction") ===
+       Geocities-style notice that a main data source went dark: a
+       blinking headline inside a marching hazard-striped frame. To remove: delete this CSS block and the
+       #outage-banner div in the page body. The days it covers are set
+       by UNDERCOUNT in the script. */
+    .outage-banner {
+      --hz-black: #111;
+      --hz-yellow: #ffcc00;
+      padding: 7px;
+      margin: -1.2rem 0 2.2rem;
+      border-radius: 3px;
+      background: repeating-linear-gradient(45deg,
+        var(--hz-black) 0 12px, var(--hz-yellow) 12px 24px);
+      background-size: 34px 34px;
+      animation: hzMarch 1.4s linear infinite;
+      box-shadow: 3px 3px 0 rgba(0,0,0,0.25);
+    }
+    @keyframes hzMarch { to { background-position: 34px 0; } }
+
+    .outage-inner {
+      text-align: center;
+      background: #fffbe0;
+      border: 2px solid var(--hz-black);
+      padding: 0.8rem 1rem;
+    }
+
+    .outage-head {
+      font-family: Impact, 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 1.35rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #c41e1e;
+      text-shadow: 2px 2px 0 var(--hz-yellow), 3px 3px 0 var(--hz-black);
+      line-height: 1.1;
+      margin-bottom: 0.35rem;
+      animation: blink 1.1s steps(1, end) infinite;
+    }
+    @keyframes blink { 75% { opacity: 0.2; } }
+
+    .outage-msg {
+      font-size: 1.02rem;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+    .outage-msg strong { font-weight: 700; }
+
+    .outage-key {
+      margin-top: 0.4rem;
+      font-size: 0.88rem;
+      font-style: italic;
+      color: var(--ink-light);
+    }
+    .outage-key .tri { color: #6a3d9a; font-style: normal; }
+
+    @media (max-width: 600px) {
+      .outage-inner { padding: 0.7rem; }
+      .outage-head  { font-size: 1.05rem; }
+      .outage-msg   { font-size: 0.95rem; }
+    }
+
+    /* Calendar days covered by UNDERCOUNT (likely underestimates): the
+       day keeps its usual color, with a dashed purple border and a
+       purple corner flag on top. Purple is used because it isn't part
+       of the green-to-red scale, so it can't be mistaken for one. */
+    .cal-day.undercount {
+      position: relative;
+      border: 2px dashed #6a3d9a;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.75);
+    }
+    .cal-under {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 17px;
+      height: 17px;
+      background: #6a3d9a;
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
+      pointer-events: none;
+    }
+    .cal-under::after {
+      content: '+';
+      position: absolute;
+      top: 0;
+      right: 2px;
+      font: 700 10px/1 Arial, sans-serif;
+      color: #fff;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -700,6 +788,18 @@
   <main>
     <h1>NJ Transit Delay Data &amp; Trends</h1>
     <p class="page-sub">NJ Transit delay costs over time &mdash; by day, line, and rush hour</p>
+
+    <!-- DATA-OUTAGE BANNER: remove this div (and the .outage-banner CSS)
+         once replacement data sources are in place. -->
+    <div class="outage-banner" id="outage-banner" role="note" aria-label="Data source notice">
+      <div class="outage-inner">
+        <div class="outage-head">&#x1F6A7; Under Construction &#x1F6A7;</div>
+        <p class="outage-msg"><strong>Note:</strong> One of our main data sources went dark in October.
+          We&rsquo;re working on replacements. Until then, delay costs are likely significant underestimates.</p>
+        <p class="outage-key">Our counts were affected starting in late August. Days affected are flagged in
+          <span class="tri">purple &#9650;</span> on the chart and calendar below.</p>
+      </div>
+    </div>
 
     <!-- Summary stats. The WS: sentinel comments are rewritten daily by
          src/web_stats.py so non-JS crawlers see real numbers — do not
@@ -883,6 +983,34 @@
     // The period (if any) a 'YYYY-MM-DD' date falls in
     function periodFor(key) {
       return CHART_PERIODS.find(p => key >= p.start && key <= p.end) || null;
+    }
+
+    // ============================================================
+    // UNDERCOUNT — days whose figures are likely underestimates
+    // ------------------------------------------------------------
+    // A main data source went dark, so days from `start` onward are
+    // flagged in purple: a ▲ point on the line chart, and a dashed
+    // purple border + corner flag (with "+" after the value) on the
+    // calendar. Set `end` (YYYY-MM-DD) to the last affected day once
+    // replacement sources are running; leave it null while ongoing.
+    // The banner at the top of the page is separate HTML (#outage-banner).
+    // ============================================================
+    const UNDERCOUNT = {
+      // The main all-lines account (njmetroalerts) stopped reaching the
+      // scraper Aug. 20–28, 2026: its posting volume exploded, so the
+      // 500-post fetch cap no longer reached back to the prior day's rush
+      // hours. It then went silent entirely on Oct. 4. Aug. 21 is the first
+      // report date after the last Raritan Valley / Atlantic City delay was
+      // logged (those lines were only ever read through that account).
+      start: '2026-08-21',
+      end:   null,
+      label: 'Likely an underestimate (main data source outage)',
+    };
+    const UNDER_COLOR = '#6a3d9a';
+
+    function isUndercount(key) {
+      return !!UNDERCOUNT && key >= UNDERCOUNT.start &&
+        (!UNDERCOUNT.end || key <= UNDERCOUNT.end);
     }
     // ============================================================
 
@@ -1157,7 +1285,9 @@
           '<div class="tt-date">'    + fmtFull(pt.date)                 + '</div>' +
           '<div class="tt-value">'   + valueLabel                       + '</div>' +
           '<div class="tt-compare">' + (onTime ? 'NJT ran on time' : vs) + '</div>' +
-          (period ? '<div class="tt-compare">' + period.label + '</div>' : '');
+          (period ? '<div class="tt-compare">' + period.label + '</div>' : '') +
+          (isUndercount(dateKey(pt.date))
+            ? '<div class="tt-compare" style="color:' + UNDER_COLOR + '">&#9650; ' + UNDERCOUNT.label + '</div>' : '');
 
         // Position relative to chart-wrap-main
         const wrap      = document.getElementById('wrap-hours');
@@ -1207,12 +1337,20 @@
       const keys     = data.map(d => dateKey(d.date));
       const inPeriod = keys.map(k => !!periodFor(k));
 
+      const under    = keys.map(k => isUndercount(k));
+
       const shownPeriods = CHART_PERIODS.filter(p => keys.some(k => k >= p.start && k <= p.end));
       const periodNoteEl = document.getElementById('line-period-note');
-      periodNoteEl.hidden = !shownPeriods.length;
-      periodNoteEl.textContent = shownPeriods.map(p =>
+      const noteParts = shownPeriods.map(p =>
         'Dotted line' + (showEvents ? ' and shaded area' : '') + ': ' + p.label + ' (' + fmtShortRange(p.start, p.end) + ').'
-      ).join(' ');
+      );
+      if (under.some(Boolean)) {
+        noteParts.push('<span style="color:' + UNDER_COLOR + '">&#9650; Purple triangles</span>: ' +
+          'likely underestimates, since ' + fmtShortDate(UNDERCOUNT.start) +
+          ' (see the note at the top of the page).');
+      }
+      periodNoteEl.hidden = !noteParts.length;
+      periodNoteEl.innerHTML = noteParts.join(' ');
 
       hoursChart = new Chart(ctx, {
         type: 'line',
@@ -1226,9 +1364,11 @@
               backgroundColor: grad,
               fill: true,
               tension: 0.3,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              pointBackgroundColor: ACCENT,
+              // Likely-underestimate days (UNDERCOUNT) are purple triangles
+              pointStyle: under.map(u => u ? 'triangle' : 'circle'),
+              pointRadius: under.map(u => u ? 7 : 5),
+              pointHoverRadius: under.map(u => u ? 10 : 8),
+              pointBackgroundColor: under.map(u => u ? UNDER_COLOR : ACCENT),
               pointBorderColor: '#f0eeeb',
               pointBorderWidth: 2,
               // Dotted line for any stretch inside a CHART_PERIODS entry
@@ -1549,11 +1689,15 @@
       calMonth  = calLatest.getMonth();
     }
 
+    // '2026-10-13' -> 'Oct 13'
+    function fmtShortDate(k) {
+      const [y, m, d] = k.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
     // '2026-10-13','2026-11-15' -> 'Oct 13 – Nov 15'
     function fmtShortRange(start, end) {
-      const f = k => { const [y, m, d] = k.split('-').map(Number);
-        return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
-      return f(start) + ' – ' + f(end);
+      return fmtShortDate(start) + ' – ' + fmtShortDate(end);
     }
 
     function buildCalLegend(avg, metric) {
@@ -1581,6 +1725,15 @@
         legend.appendChild(item);
       });
 
+      if (UNDERCOUNT) {
+        const item = document.createElement('span');
+        item.className = 'cal-legend-item';
+        item.innerHTML = '<span class="cal-swatch cal-day undercount" style="padding:0;aspect-ratio:auto;background:#f6d44b">' +
+          '<span class="cal-under" style="width:11px;height:11px"></span></span>' +
+          'Likely an underestimate (data source outage, since ' + fmtShortDate(UNDERCOUNT.start) + ')';
+        legend.appendChild(item);
+      }
+
       document.getElementById('cal-note').textContent =
         'Average = ' + (metric === 'cost'
           ? formatDollars(String(avg))
@@ -1598,7 +1751,8 @@
       const period = periodFor(dateKey(pt.date));
       document.getElementById('cal-detail').innerHTML =
         fmtFull(pt.date) + '<br><strong>' + valueLabel + '</strong> &middot; ' + compareToAvg(val, avg) +
-        (period ? '<br><em>' + period.label + '</em>' : '');
+        (period ? '<br><em>' + period.label + '</em>' : '') +
+        (isUndercount(dateKey(pt.date)) ? '<br><em style="color:' + UNDER_COLOR + '">&#9650; ' + UNDERCOUNT.label + '</em>' : '');
     }
 
     function renderCalendar() {
@@ -1660,18 +1814,21 @@
         else below++;
 
         const period = periodFor(dateKey(date));
+        const underDay = isUndercount(dateKey(date));
         const cell = document.createElement('button');
         cell.type = 'button';
-        cell.className = 'cal-day' + (period ? ' period' : '');
+        cell.className = 'cal-day' + (period ? ' period' : '') + (underDay ? ' undercount' : '');
         cell.style.background = period ? periodHatch(bin.color) : bin.color;
         cell.style.color = bin.text;
         cell.setAttribute('aria-label',
           fmtFull(date) + ': ' + formatMetricValue(val, metric) + ', ' + compareToAvg(val, avg) + ' (' + bin.label.toLowerCase() + ')' +
-          (period ? ', during the ' + period.label : ''));
+          (period ? ', during the ' + period.label : '') +
+          (underDay ? '. ' + UNDERCOUNT.label : ''));
         cell.innerHTML =
           '<span class="cal-num">' + day + '</span>' +
           (period ? periodNote(period) : '') +
-          '<span class="cal-val">' + compactValue(val, metric) + '</span>';
+          (underDay ? '<span class="cal-under" aria-hidden="true"></span>' : '') +
+          '<span class="cal-val">' + compactValue(val, metric) + (underDay ? '+' : '') + '</span>';
 
         const select = () => {
           if (selectedCell) selectedCell.classList.remove('selected');
